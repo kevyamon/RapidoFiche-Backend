@@ -16,7 +16,8 @@ import { ERROR_CODES } from '../constants/errors.constants';
 
 export class PedagogyService {
   public static async getCycles(): Promise<ICycleDocument[]> {
-    return CycleModel.find({ active: true }).sort({ order: 1 }).lean();
+    const cycles = await CycleModel.find({ active: true }).sort({ order: 1 }).lean();
+    return cycles as unknown as ICycleDocument[];
   }
 
   public static async getLevels(cycleId?: string): Promise<IEducationLevelDocument[]> {
@@ -24,7 +25,8 @@ export class PedagogyService {
     if (cycleId) {
       filter.cycleId = new Types.ObjectId(cycleId);
     }
-    return EducationLevelModel.find(filter).sort({ order: 1 }).lean();
+    const levels = await EducationLevelModel.find(filter).sort({ order: 1 }).lean();
+    return levels as unknown as IEducationLevelDocument[];
   }
 
   public static async getLevelById(id: string): Promise<IEducationLevelDocument> {
@@ -32,7 +34,7 @@ export class PedagogyService {
     if (!level) {
       throw new AppError(ERROR_CODES.RESOURCE_NOT_FOUND, 'Niveau scolaire introuvable', 404);
     }
-    return level;
+    return level as unknown as IEducationLevelDocument;
   }
 
   public static async getSubjects(levelId?: string): Promise<ISubjectDocument[]> {
@@ -40,18 +42,20 @@ export class PedagogyService {
     if (levelId) {
       filter.levelIds = new Types.ObjectId(levelId);
     }
-    return SubjectModel.find(filter).sort({ order: 1 }).lean();
+    const subjects = await SubjectModel.find(filter).sort({ order: 1 }).lean();
+    return subjects as unknown as ISubjectDocument[];
   }
 
   public static async getTeacherSubjects(
     teacherPrimaryLevelId: string
   ): Promise<ISubjectDocument[]> {
-    return SubjectModel.find({
+    const subjects = await SubjectModel.find({
       levelIds: new Types.ObjectId(teacherPrimaryLevelId),
       active: true,
     })
       .sort({ order: 1 })
       .lean();
+    return subjects as unknown as ISubjectDocument[];
   }
 
   public static async getDomains(
@@ -69,7 +73,8 @@ export class PedagogyService {
         { levelIds: new Types.ObjectId(levelId) },
       ];
     }
-    return SubjectDomainModel.find(filter).sort({ order: 1 }).lean();
+    const domains = await SubjectDomainModel.find(filter).sort({ order: 1 }).lean();
+    return domains as unknown as ISubjectDomainDocument[];
   }
 
   public static async deleteLevel(id: string): Promise<void> {

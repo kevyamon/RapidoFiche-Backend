@@ -80,9 +80,10 @@ describe('Tests de Contrôle d’Accès Mode Forteresse (CDC Section 141)', () =
 
     try {
       await ContentAccessService.assertCanAccessLesson(teacherId, ROLES.TEACHER, ce1LessonId);
-    } catch (err: any) {
-      expect(err.code).toBe(ERROR_CODES.LEVEL_ACCESS_DENIED);
-      expect(err.statusCode).toBe(403);
+    } catch (err: unknown) {
+      const appErr = err as AppError;
+      expect(appErr.code).toBe(ERROR_CODES.LEVEL_ACCESS_DENIED);
+      expect(appErr.statusCode).toBe(403);
     }
   });
 
@@ -119,9 +120,10 @@ describe('Tests de Contrôle d’Accès Mode Forteresse (CDC Section 141)', () =
 
     try {
       await ContentAccessService.assertCanAccessLesson(teacherId, ROLES.TEACHER, cm2LessonId);
-    } catch (err: any) {
-      expect(err.code).toBe(ERROR_CODES.SUBSCRIPTION_EXPIRED);
-      expect(err.statusCode).toBe(403);
+    } catch (err: unknown) {
+      const appErr = err as AppError;
+      expect(appErr.code).toBe(ERROR_CODES.SUBSCRIPTION_EXPIRED);
+      expect(appErr.statusCode).toBe(403);
     }
   });
 

@@ -142,8 +142,9 @@ export class PaymentService {
   }
 
   public static async getTeacherPayments(userId: string): Promise<IPaymentDocument[]> {
-    return PaymentModel.find({ userId: new Types.ObjectId(userId) })
+    const payments = await PaymentModel.find({ userId: new Types.ObjectId(userId) })
       .sort({ createdAt: -1 })
       .lean();
+    return payments as unknown as IPaymentDocument[];
   }
 }

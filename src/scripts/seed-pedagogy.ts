@@ -25,17 +25,21 @@ async function seed() {
       { upsert: true, new: true }
     );
 
+    if (!preschoolCycle || !primaryCycle) {
+      throw new Error('Échec d’initialisation des cycles');
+    }
+
     // 2. Initialisation des 9 Niveaux (CDC Section 11)
     const levelsData: Array<{ cycleId: mongoose.Types.ObjectId; code: EducationLevelCode; label: string; order: number }> = [
-      { cycleId: preschoolCycle._id, code: 'PS', label: 'Petite Section', order: 1 },
-      { cycleId: preschoolCycle._id, code: 'MS', label: 'Moyenne Section', order: 2 },
-      { cycleId: preschoolCycle._id, code: 'GS', label: 'Grande Section', order: 3 },
-      { cycleId: primaryCycle._id, code: 'CP1', label: 'Cours Préparatoire 1ère année', order: 4 },
-      { cycleId: primaryCycle._id, code: 'CP2', label: 'Cours Préparatoire 2ème année', order: 5 },
-      { cycleId: primaryCycle._id, code: 'CE1', label: 'Cours Élémentaire 1ère année', order: 6 },
-      { cycleId: primaryCycle._id, code: 'CE2', label: 'Cours Élémentaire 2ème année', order: 7 },
-      { cycleId: primaryCycle._id, code: 'CM1', label: 'Cours Moyen 1ère année', order: 8 },
-      { cycleId: primaryCycle._id, code: 'CM2', label: 'Cours Moyen 2ème année', order: 9 },
+      { cycleId: preschoolCycle._id as mongoose.Types.ObjectId, code: 'PS', label: 'Petite Section', order: 1 },
+      { cycleId: preschoolCycle._id as mongoose.Types.ObjectId, code: 'MS', label: 'Moyenne Section', order: 2 },
+      { cycleId: preschoolCycle._id as mongoose.Types.ObjectId, code: 'GS', label: 'Grande Section', order: 3 },
+      { cycleId: primaryCycle._id as mongoose.Types.ObjectId, code: 'CP1', label: 'Cours Préparatoire 1ère année', order: 4 },
+      { cycleId: primaryCycle._id as mongoose.Types.ObjectId, code: 'CP2', label: 'Cours Préparatoire 2ème année', order: 5 },
+      { cycleId: primaryCycle._id as mongoose.Types.ObjectId, code: 'CE1', label: 'Cours Élémentaire 1ère année', order: 6 },
+      { cycleId: primaryCycle._id as mongoose.Types.ObjectId, code: 'CE2', label: 'Cours Élémentaire 2ème année', order: 7 },
+      { cycleId: primaryCycle._id as mongoose.Types.ObjectId, code: 'CM1', label: 'Cours Moyen 1ère année', order: 8 },
+      { cycleId: primaryCycle._id as mongoose.Types.ObjectId, code: 'CM2', label: 'Cours Moyen 2ème année', order: 9 },
     ];
 
     const levelMap = new Map<string, mongoose.Types.ObjectId>();
@@ -46,7 +50,9 @@ async function seed() {
         lvl,
         { upsert: true, new: true }
       );
-      levelMap.set(lvl.code, savedLevel._id);
+      if (savedLevel) {
+        levelMap.set(lvl.code, savedLevel._id as mongoose.Types.ObjectId);
+      }
     }
 
     const allLevelIds = Array.from(levelMap.values());
