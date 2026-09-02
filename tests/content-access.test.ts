@@ -4,7 +4,7 @@ import { ContentAccessService } from '../src/services/content-access.service';
 import { LessonModel } from '../src/models/lesson.model';
 import { UserModel } from '../src/models/user.model';
 import { SubscriptionModel } from '../src/models/subscription.model';
-import { ROLES } from '../constants/roles.constants';
+import { ROLES } from '../src/constants/roles.constants';
 import { AppError } from '../src/utils/app-error.utils';
 import { ERROR_CODES } from '../src/constants/errors.constants';
 
