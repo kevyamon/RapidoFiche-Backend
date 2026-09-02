@@ -75,7 +75,7 @@ export class AuthService {
 
     const tokens = this.generateUserTokens(user);
     return {
-      user: user.toJSON(),
+      user: user.toJSON() as unknown as AuthResponse['user'],
       tokens,
     };
   }
@@ -125,7 +125,7 @@ export class AuthService {
 
     const tokens = this.generateUserTokens(user);
     return {
-      user: user.toJSON(),
+      user: user.toJSON() as unknown as AuthResponse['user'],
       tokens,
     };
   }
@@ -176,7 +176,7 @@ export class AuthService {
 
     const tokens = this.generateUserTokens(user);
     return {
-      user: user.toJSON(),
+      user: user.toJSON() as unknown as AuthResponse['user'],
       tokens,
     };
   }

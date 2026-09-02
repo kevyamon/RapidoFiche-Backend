@@ -26,7 +26,7 @@ export class ContentAccessService {
   }
 
   public static async canAccessLevel(
-    userId: string,
+    _userId: string,
     userRole: UserRole,
     userLevelId: string | undefined,
     targetLevelId: string

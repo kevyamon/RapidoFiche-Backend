@@ -5,6 +5,7 @@ import { StorageService } from '../integrations/storage/storage.service';
 import { AssetModel } from '../models/asset.model';
 import { LessonModel } from '../models/lesson.model';
 import { verifyLessonAccessToken } from '../utils/token.utils';
+import { QueryLessonsInput } from '../schemas/lesson.schema';
 import { ApiSuccessResponse, ApiPaginatedResponse } from '../contracts/api.types';
 import { AppError } from '../utils/app-error.utils';
 import { ERROR_CODES } from '../constants/errors.constants';
@@ -17,7 +18,7 @@ export class LessonController {
   ): Promise<void> {
     try {
       const result = await LessonService.getLessons(
-        req.query,
+        req.query as unknown as QueryLessonsInput,
         req.user?.role,
         req.user?.primaryLevelId
       );
