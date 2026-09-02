@@ -1,0 +1,72 @@
+export const ROLES = {
+  TEACHER: 'TEACHER',
+  ADMIN: 'ADMIN',
+  CONTENT_MANAGER: 'CONTENT_MANAGER',
+} as const;
+
+export type UserRole = (typeof ROLES)[keyof typeof ROLES];
+
+export const PERMISSIONS = {
+  // Enseignant
+  PROFILE_READ: 'profile.read',
+  PROFILE_UPDATE: 'profile.update',
+  LESSONS_READ: 'lessons.read',
+  FAVORITES_READ: 'favorites.read',
+  FAVORITES_MANAGE: 'favorites.manage',
+  HISTORY_READ: 'history.read',
+  SUBSCRIPTION_READ: 'subscription.read',
+  PAYMENTS_CREATE: 'payments.create',
+
+  // Référentiel & Contenu (Admin & Content Manager)
+  REFERENCE_MANAGE: 'reference.manage',
+  LESSONS_MANAGE: 'lessons.manage',
+  IMPORT_MANAGE: 'import.manage',
+
+  // Administration Globale (Admin uniquement)
+  USERS_MANAGE: 'admin.users.manage',
+  SUBSCRIPTIONS_MANAGE: 'admin.subscriptions.manage',
+  PAYMENTS_MANAGE: 'admin.payments.manage',
+  STATS_READ: 'admin.stats.read',
+  AUDIT_READ: 'admin.audit.read',
+} as const;
+
+export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+
+export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
+  [ROLES.TEACHER]: [
+    PERMISSIONS.PROFILE_READ,
+    PERMISSIONS.PROFILE_UPDATE,
+    PERMISSIONS.LESSONS_READ,
+    PERMISSIONS.FAVORITES_READ,
+    PERMISSIONS.FAVORITES_MANAGE,
+    PERMISSIONS.HISTORY_READ,
+    PERMISSIONS.SUBSCRIPTION_READ,
+    PERMISSIONS.PAYMENTS_CREATE,
+  ],
+  [ROLES.CONTENT_MANAGER]: [
+    PERMISSIONS.PROFILE_READ,
+    PERMISSIONS.PROFILE_UPDATE,
+    PERMISSIONS.LESSONS_READ,
+    PERMISSIONS.REFERENCE_MANAGE,
+    PERMISSIONS.LESSONS_MANAGE,
+    PERMISSIONS.IMPORT_MANAGE,
+  ],
+  [ROLES.ADMIN]: [
+    PERMISSIONS.PROFILE_READ,
+    PERMISSIONS.PROFILE_UPDATE,
+    PERMISSIONS.LESSONS_READ,
+    PERMISSIONS.FAVORITES_READ,
+    PERMISSIONS.FAVORITES_MANAGE,
+    PERMISSIONS.HISTORY_READ,
+    PERMISSIONS.SUBSCRIPTION_READ,
+    PERMISSIONS.PAYMENTS_CREATE,
+    PERMISSIONS.REFERENCE_MANAGE,
+    PERMISSIONS.LESSONS_MANAGE,
+    PERMISSIONS.IMPORT_MANAGE,
+    PERMISSIONS.USERS_MANAGE,
+    PERMISSIONS.SUBSCRIPTIONS_MANAGE,
+    PERMISSIONS.PAYMENTS_MANAGE,
+    PERMISSIONS.STATS_READ,
+    PERMISSIONS.AUDIT_READ,
+  ],
+};
