@@ -86,14 +86,15 @@ const userSchema = new Schema<IUserDocument>(
     timestamps: true,
     toJSON: {
       transform: (_doc, ret) => {
-        ret.id = ret._id.toString();
-        if (ret.primaryLevelId) {
-          ret.primaryLevelId = ret.primaryLevelId.toString();
+        const obj = ret as unknown as Record<string, unknown>;
+        obj.id = (obj._id as { toString(): string })?.toString();
+        if (obj.primaryLevelId) {
+          obj.primaryLevelId = (obj.primaryLevelId as { toString(): string }).toString();
         }
-        delete ret._id;
-        delete ret.__v;
-        delete ret.passwordHash;
-        return ret;
+        delete obj._id;
+        delete obj.__v;
+        delete obj.passwordHash;
+        return obj;
       },
     },
   }

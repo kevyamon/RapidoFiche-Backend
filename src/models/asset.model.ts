@@ -65,10 +65,11 @@ const assetSchema = new Schema<IAssetDocument>(
     timestamps: true,
     toJSON: {
       transform: (_doc, ret) => {
-        ret.id = ret._id.toString();
-        delete ret._id;
-        delete ret.__v;
-        return ret;
+        const obj = ret as unknown as Record<string, unknown>;
+        obj.id = (obj._id as { toString(): string })?.toString();
+        delete obj._id;
+        delete obj.__v;
+        return obj;
       },
     },
   }

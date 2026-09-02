@@ -55,11 +55,14 @@ const subjectSchema = new Schema<ISubjectDocument>(
     timestamps: true,
     toJSON: {
       transform: (_doc, ret) => {
-        ret.id = ret._id.toString();
-        ret.levelIds = ret.levelIds?.map((id: Types.ObjectId) => id.toString());
-        delete ret._id;
-        delete ret.__v;
-        return ret;
+        const obj = ret as unknown as Record<string, unknown>;
+        obj.id = (obj._id as { toString(): string })?.toString();
+        if (Array.isArray(obj.levelIds)) {
+          obj.levelIds = obj.levelIds.map((id: { toString(): string }) => id.toString());
+        }
+        delete obj._id;
+        delete obj.__v;
+        return obj;
       },
     },
   }

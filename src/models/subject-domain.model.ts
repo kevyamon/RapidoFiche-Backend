@@ -54,14 +54,17 @@ const subjectDomainSchema = new Schema<ISubjectDomainDocument>(
     timestamps: true,
     toJSON: {
       transform: (_doc, ret) => {
-        ret.id = ret._id.toString();
-        ret.subjectId = ret.subjectId?.toString();
-        if (ret.levelIds) {
-          ret.levelIds = ret.levelIds.map((id: Types.ObjectId) => id.toString());
+        const obj = ret as unknown as Record<string, unknown>;
+        obj.id = (obj._id as { toString(): string })?.toString();
+        if (obj.subjectId) {
+          obj.subjectId = (obj.subjectId as { toString(): string }).toString();
         }
-        delete ret._id;
-        delete ret.__v;
-        return ret;
+        if (Array.isArray(obj.levelIds)) {
+          obj.levelIds = obj.levelIds.map((id: { toString(): string }) => id.toString());
+        }
+        delete obj._id;
+        delete obj.__v;
+        return obj;
       },
     },
   }

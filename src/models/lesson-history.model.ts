@@ -40,12 +40,13 @@ const lessonHistorySchema = new Schema<ILessonHistoryDocument>(
     timestamps: true,
     toJSON: {
       transform: (_doc, ret) => {
-        ret.id = ret._id.toString();
-        ret.userId = ret.userId?.toString();
-        ret.lessonId = ret.lessonId?.toString();
-        delete ret._id;
-        delete ret.__v;
-        return ret;
+        const obj = ret as unknown as Record<string, unknown>;
+        obj.id = (obj._id as { toString(): string })?.toString();
+        if (obj.userId) obj.userId = (obj.userId as { toString(): string }).toString();
+        if (obj.lessonId) obj.lessonId = (obj.lessonId as { toString(): string }).toString();
+        delete obj._id;
+        delete obj.__v;
+        return obj;
       },
     },
   }

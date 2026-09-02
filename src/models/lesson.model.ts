@@ -166,17 +166,20 @@ const lessonSchema = new Schema<ILessonDocument>(
     timestamps: true,
     toJSON: {
       transform: (_doc, ret) => {
-        ret.id = ret._id.toString();
-        ret.levelId = ret.levelId?.toString();
-        ret.subjectId = ret.subjectId?.toString();
-        ret.domainId = ret.domainId?.toString();
-        ret.fileAssetId = ret.fileAssetId?.toString();
-        ret.thumbnailAssetId = ret.thumbnailAssetId?.toString();
-        ret.createdBy = ret.createdBy?.toString();
-        ret.updatedBy = ret.updatedBy?.toString();
-        delete ret._id;
-        delete ret.__v;
-        return ret;
+        const obj = ret as unknown as Record<string, unknown>;
+        obj.id = (obj._id as { toString(): string })?.toString();
+        if (obj.levelId) obj.levelId = (obj.levelId as { toString(): string }).toString();
+        if (obj.subjectId) obj.subjectId = (obj.subjectId as { toString(): string }).toString();
+        if (obj.domainId) obj.domainId = (obj.domainId as { toString(): string }).toString();
+        if (obj.fileAssetId) obj.fileAssetId = (obj.fileAssetId as { toString(): string }).toString();
+        if (obj.thumbnailAssetId) {
+          obj.thumbnailAssetId = (obj.thumbnailAssetId as { toString(): string }).toString();
+        }
+        if (obj.createdBy) obj.createdBy = (obj.createdBy as { toString(): string }).toString();
+        if (obj.updatedBy) obj.updatedBy = (obj.updatedBy as { toString(): string }).toString();
+        delete obj._id;
+        delete obj.__v;
+        return obj;
       },
     },
   }
