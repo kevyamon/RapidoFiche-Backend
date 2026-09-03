@@ -1,6 +1,7 @@
 import { createApp } from './app';
 import { env } from './config/env.config';
 import { connectDatabase, disconnectDatabase } from './config/database.config';
+import { BootstrapService } from './services/bootstrap.service';
 import { logger } from './utils/logger.utils';
 
 async function bootstrap() {
@@ -8,7 +9,10 @@ async function bootstrap() {
     // 1. Connexion à la base de données MongoDB
     await connectDatabase();
 
-    // 2. Initialisation de l'application Express
+    // 2. Initialisation automatique du référentiel (Cycles, 9 Niveaux, Matières, Offre 200F)
+    await BootstrapService.autoSeedIfEmpty();
+
+    // 3. Initialisation de l'application Express
     const app = createApp();
 
     // 3. Démarrage du serveur HTTP
