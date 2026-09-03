@@ -9,6 +9,7 @@ export interface IUser {
   lastName: string;
   email: string;
   phone?: string;
+  avatarUrl?: string;
   passwordHash?: string;
   googleId?: string;
   role: UserRole;
@@ -46,6 +47,10 @@ const userSchema = new Schema<IUserDocument>(
       index: true,
     },
     phone: {
+      type: String,
+      trim: true,
+    },
+    avatarUrl: {
       type: String,
       trim: true,
     },

@@ -8,6 +8,7 @@ import { FavoriteHistoryController } from '../controllers/favorite-history.contr
 import { SubscriptionPaymentController } from '../controllers/subscription-payment.controller';
 import { AdminManagementController } from '../controllers/admin-management.controller';
 import { AdminOperationsController } from '../controllers/admin-operations.controller';
+import { UserProfileController } from '../controllers/user-profile.controller';
 import { authenticate, optionalAuth } from '../middlewares/auth.middleware';
 import { requireRole } from '../middlewares/rbac.middleware';
 import {
@@ -20,6 +21,8 @@ import {
   registerSchema,
   loginSchema,
   googleAuthSchema,
+  updateProfileSchema,
+  changePasswordSchema,
 } from '../schemas/auth.schema';
 import {
   createLessonSchema,
@@ -76,6 +79,18 @@ apiRouter.delete('/me/favorites/:lessonId', authenticate, FavoriteHistoryControl
 apiRouter.get('/me/history', authenticate, FavoriteHistoryController.getHistory);
 apiRouter.get('/me/subscription', authenticate, SubscriptionPaymentController.getMySubscription);
 apiRouter.get('/me/payments', authenticate, SubscriptionPaymentController.getMyPayments);
+apiRouter.patch(
+  '/me/profile',
+  authenticate,
+  validate(updateProfileSchema),
+  UserProfileController.updateProfile
+);
+apiRouter.post(
+  '/me/change-password',
+  authenticate,
+  validate(changePasswordSchema),
+  UserProfileController.changePassword
+);
 
 // ==================== FICHES PÉDAGOGIQUES ====================
 apiRouter.get('/lessons', optionalAuth, validate(queryLessonsSchema), LessonController.getLessons);

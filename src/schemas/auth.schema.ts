@@ -70,14 +70,22 @@ export const updateProfileSchema = z.object({
   body: z.object({
     firstName: z.string().trim().min(2).max(100).optional(),
     lastName: z.string().trim().min(2).max(100).optional(),
+    email: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .email('L’adresse email fournie n’est pas valide')
+      .optional(),
     phone: z
       .string()
       .trim()
-      .regex(/^[0-9+\s-]{8,20}$/)
-      .optional(),
+      .regex(/^[0-9+\s-]{8,20}$/, 'Format de numéro invalide')
+      .optional()
+      .or(z.literal('')),
+    avatarUrl: z.string().trim().optional().or(z.literal('')),
     primaryLevelId: z
       .string()
-      .regex(OBJECT_ID_REGEX, 'L’identifiant du niveau est invalide')
+      .min(2, 'L’identifiant du niveau est invalide')
       .optional(),
   }),
 });
@@ -87,10 +95,7 @@ export const changePasswordSchema = z.object({
     currentPassword: z.string().min(1, 'Le mot de passe actuel est obligatoire'),
     newPassword: z
       .string()
-      .min(8, 'Le nouveau mot de passe doit comporter au moins 8 caractères')
-      .regex(/[A-Z]/, 'Le mot de passe doit contenir au moins une majuscule')
-      .regex(/[a-z]/, 'Le mot de passe doit contenir au moins une minuscule')
-      .regex(/[0-9]/, 'Le mot de passe doit contenir au moins un chiffre'),
+      .min(8, 'Le nouveau mot de passe doit comporter au moins 8 caractères'),
   }),
 });
 

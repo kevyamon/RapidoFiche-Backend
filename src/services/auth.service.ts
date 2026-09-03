@@ -83,6 +83,7 @@ export class AuthService {
       levelId: level._id.toString(),
     });
 
+    await user.populate('primaryLevelId', 'code label');
     const tokens = this.generateUserTokens(user);
     return {
       user: user.toJSON() as unknown as AuthResponse['user'],
@@ -133,6 +134,7 @@ export class AuthService {
 
     logger.info('AUTH', `Connexion réussie : ${user.email}`);
 
+    await user.populate('primaryLevelId', 'code label');
     const tokens = this.generateUserTokens(user);
     return {
       user: user.toJSON() as unknown as AuthResponse['user'],
@@ -203,6 +205,7 @@ export class AuthService {
       );
     }
 
+    await user.populate('primaryLevelId', 'code label');
     const tokens = this.generateUserTokens(user);
     return {
       user: user.toJSON() as unknown as AuthResponse['user'],
