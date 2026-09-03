@@ -27,6 +27,7 @@ export class AuthController {
         data: {
           user: result.user,
           accessToken: result.tokens.accessToken,
+          tokens: result.tokens,
         },
       });
     } catch (error) {
@@ -48,6 +49,7 @@ export class AuthController {
         data: {
           user: result.user,
           accessToken: result.tokens.accessToken,
+          tokens: result.tokens,
         },
       });
     } catch (error) {
@@ -69,6 +71,7 @@ export class AuthController {
         data: {
           user: result.user,
           accessToken: result.tokens.accessToken,
+          tokens: result.tokens,
         },
       });
     } catch (error) {
