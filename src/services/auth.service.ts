@@ -47,7 +47,17 @@ export class AuthService {
       );
     }
 
-    const level = await EducationLevelModel.findById(input.primaryLevelId).lean();
+    const isObjectId =
+      Types.ObjectId.isValid(input.primaryLevelId) &&
+      input.primaryLevelId.length === 24;
+
+    const level = await EducationLevelModel.findOne({
+      $or: [
+        ...(isObjectId ? [{ _id: new Types.ObjectId(input.primaryLevelId) }] : []),
+        { code: input.primaryLevelId.toUpperCase() },
+      ],
+    }).lean();
+
     if (!level || !level.active) {
       throw new AppError(
         ERROR_CODES.RESOURCE_NOT_FOUND,
@@ -60,17 +70,17 @@ export class AuthService {
       firstName: input.firstName,
       lastName: input.lastName,
       email: input.email,
-      phone: input.phone,
+      phone: input.phone || undefined,
       passwordHash: input.password,
       role: ROLES.TEACHER,
-      primaryLevelId: new Types.ObjectId(input.primaryLevelId),
+      primaryLevelId: level._id,
       status: 'ACTIVE',
       lastLoginAt: new Date(),
     });
 
     logger.info('AUTH', `Nouvel enseignant inscrit : ${user.email}`, {
       userId: user.id,
-      levelId: input.primaryLevelId,
+      levelId: level._id.toString(),
     });
 
     const tokens = this.generateUserTokens(user);
@@ -146,13 +156,32 @@ export class AuthService {
         );
       }
 
+      const isObjectId =
+        Types.ObjectId.isValid(input.primaryLevelId) &&
+        input.primaryLevelId.length === 24;
+
+      const level = await EducationLevelModel.findOne({
+        $or: [
+          ...(isObjectId ? [{ _id: new Types.ObjectId(input.primaryLevelId) }] : []),
+          { code: input.primaryLevelId.toUpperCase() },
+        ],
+      }).lean();
+
+      if (!level || !level.active) {
+        throw new AppError(
+          ERROR_CODES.RESOURCE_NOT_FOUND,
+          'Le niveau pédagogique sélectionné n’existe pas ou n’est plus actif',
+          404
+        );
+      }
+
       user = await UserModel.create({
         firstName: googleProfile.firstName,
         lastName: googleProfile.lastName,
         email: googleProfile.email,
         googleId: googleProfile.googleId,
         role: ROLES.TEACHER,
-        primaryLevelId: new Types.ObjectId(input.primaryLevelId),
+        primaryLevelId: level._id,
         status: 'ACTIVE',
         lastLoginAt: new Date(),
       });

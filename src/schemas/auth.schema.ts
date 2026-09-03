@@ -26,16 +26,14 @@ export const registerSchema = z.object({
         /^[0-9+\s-]{8,20}$/,
         'Le numéro de téléphone doit être valide (ex: +225 0700000000)'
       )
-      .optional(),
+      .optional()
+      .or(z.literal('')),
     password: z
       .string()
-      .min(8, 'Le mot de passe doit comporter au moins 8 caractères')
-      .regex(/[A-Z]/, 'Le mot de passe doit contenir au moins une majuscule')
-      .regex(/[a-z]/, 'Le mot de passe doit contenir au moins une minuscule')
-      .regex(/[0-9]/, 'Le mot de passe doit contenir au moins un chiffre'),
+      .min(8, 'Le mot de passe doit comporter au moins 8 caractères'),
     primaryLevelId: z
       .string()
-      .regex(OBJECT_ID_REGEX, 'L’identifiant du niveau principal est invalide'),
+      .min(2, 'Le niveau pédagogique principal est obligatoire'),
   }),
 });
 
