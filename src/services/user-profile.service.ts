@@ -4,7 +4,7 @@ import { UserModel, IUserDocument } from '../models/user.model';
 import { EducationLevelModel } from '../models/education-level.model';
 import { UpdateProfileInput } from '../schemas/auth.schema';
 import { AppError } from '../utils/app-error.utils';
-import { ERROR_CODES } from '../constants/error-codes.constants';
+import { ERROR_CODES } from '../constants/errors.constants';
 import { logger } from '../utils/logger.utils';
 
 export class UserProfileService {

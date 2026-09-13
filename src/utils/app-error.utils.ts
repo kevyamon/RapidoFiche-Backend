@@ -23,6 +23,10 @@ export class AppError extends Error {
     Error.captureStackTrace(this, this.constructor);
   }
 
+  public static badRequest(message = 'Requête invalide'): AppError {
+    return new AppError(ERROR_CODES.VALIDATION_ERROR, message, 400);
+  }
+
   public static unauthorized(message = 'Authentification requise pour cette action'): AppError {
     return new AppError(ERROR_CODES.AUTH_REQUIRED, message, 401);
   }
