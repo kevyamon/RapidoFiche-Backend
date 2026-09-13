@@ -81,8 +81,16 @@ export const updateProfileSchema = z.object({
       .trim()
       .regex(/^[0-9+\s-]{8,20}$/, 'Format de numéro invalide')
       .optional()
+      .nullable()
       .or(z.literal('')),
-    avatarUrl: z.string().trim().optional().or(z.literal('')),
+    phoneNumber: z
+      .string()
+      .trim()
+      .regex(/^[0-9+\s-]{8,20}$/, 'Format de numéro invalide')
+      .optional()
+      .nullable()
+      .or(z.literal('')),
+    avatarUrl: z.string().trim().optional().nullable().or(z.literal('')),
     primaryLevelId: z
       .string()
       .min(2, 'L’identifiant du niveau est invalide')

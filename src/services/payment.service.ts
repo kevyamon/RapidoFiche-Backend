@@ -52,6 +52,12 @@ export class PaymentService {
       paymentMethod: input.paymentMethod,
     });
 
+    const finalPhone = input.phoneNumber || input.customerPhone || user.phone;
+    if (finalPhone && !user.phone) {
+      user.phone = finalPhone;
+      await user.save();
+    }
+
     // 2. Appel à l'orchestrateur GeniusPay
     const session = await GeniusPayService.createPaymentSession({
       amount,
@@ -60,7 +66,7 @@ export class PaymentService {
       description: 'Abonnement mensuel RapidoFiche - 200 FCFA',
       customerName: `${user.firstName} ${user.lastName}`,
       customerEmail: user.email,
-      customerPhone: input.customerPhone || user.phone,
+      customerPhone: finalPhone,
       paymentMethod: input.paymentMethod,
     });
 

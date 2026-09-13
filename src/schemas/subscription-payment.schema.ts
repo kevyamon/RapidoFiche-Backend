@@ -16,6 +16,12 @@ export const initiatePaymentSchema = z.object({
       .trim()
       .regex(/^[0-9+\s-]{8,20}$/, 'Numéro de téléphone invalide')
       .optional(),
+    phoneNumber: z
+      .string()
+      .trim()
+      .regex(/^[0-9+\s-]{8,20}$/, 'Numéro de téléphone invalide')
+      .optional(),
+    callbackUrl: z.string().optional(),
   }),
 });
 

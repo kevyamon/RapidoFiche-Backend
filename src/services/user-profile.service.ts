@@ -39,7 +39,8 @@ export class UserProfileService {
 
     if (input.firstName) user.firstName = input.firstName;
     if (input.lastName) user.lastName = input.lastName;
-    if (input.phone !== undefined) user.phone = input.phone || undefined;
+    const finalPhone = input.phone !== undefined ? input.phone : (input as any).phoneNumber;
+    if (finalPhone !== undefined) user.phone = finalPhone || undefined;
     if (input.avatarUrl !== undefined) user.avatarUrl = input.avatarUrl || undefined;
 
     if (input.primaryLevelId) {

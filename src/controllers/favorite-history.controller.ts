@@ -65,6 +65,35 @@ export class FavoriteHistoryController {
     }
   }
 
+  public static async toggleFavorite(
+    req: Request,
+    res: Response<ApiSuccessResponse<{ isFavorite: boolean; message: string }>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      if (!req.user) throw AppError.unauthorized();
+      const lessonId = req.body?.lessonId || req.params?.lessonId;
+      if (!lessonId) throw AppError.badRequest('Identifiant de la fiche requis');
+
+      const isFav = await FavoriteHistoryService.isFavorite(req.user.id, lessonId);
+      if (isFav) {
+        await FavoriteHistoryService.removeFavorite(req.user.id, lessonId);
+        res.status(200).json({
+          success: true,
+          data: { isFavorite: false, message: 'Fiche retirée de vos favoris' },
+        });
+      } else {
+        await FavoriteHistoryService.addFavorite(req.user.id, lessonId);
+        res.status(200).json({
+          success: true,
+          data: { isFavorite: true, message: 'Fiche ajoutée à vos favoris' },
+        });
+      }
+    } catch (error) {
+      next(error);
+    }
+  }
+
   public static async getHistory(
     req: Request,
     res: Response<ApiSuccessResponse<unknown>>,

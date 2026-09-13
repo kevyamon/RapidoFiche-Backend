@@ -71,14 +71,23 @@ apiRouter.get('/levels/:id', PedagogyController.getLevelById);
 apiRouter.get('/subjects', PedagogyController.getSubjects);
 apiRouter.get('/domains', PedagogyController.getDomains);
 
-// ==================== ESPACE ENSEIGNANT (/me) ====================
+// ==================== ESPACE ENSEIGNANT (/me & ALIASES) ====================
 apiRouter.get('/me/subjects', authenticate, PedagogyController.getTeacherSubjects);
 apiRouter.get('/me/favorites', authenticate, FavoriteHistoryController.getFavorites);
+apiRouter.get('/favorites', authenticate, FavoriteHistoryController.getFavorites);
 apiRouter.post('/me/favorites/:lessonId', authenticate, FavoriteHistoryController.addFavorite);
 apiRouter.delete('/me/favorites/:lessonId', authenticate, FavoriteHistoryController.removeFavorite);
+apiRouter.post('/favorites/toggle', authenticate, FavoriteHistoryController.toggleFavorite);
+
 apiRouter.get('/me/history', authenticate, FavoriteHistoryController.getHistory);
+apiRouter.get('/history', authenticate, FavoriteHistoryController.getHistory);
+
 apiRouter.get('/me/subscription', authenticate, SubscriptionPaymentController.getMySubscription);
+apiRouter.get('/subscriptions/me', authenticate, SubscriptionPaymentController.getMySubscription);
 apiRouter.get('/me/payments', authenticate, SubscriptionPaymentController.getMyPayments);
+apiRouter.get('/payments/me', authenticate, SubscriptionPaymentController.getMyPayments);
+
+apiRouter.get('/me/profile', authenticate, AuthController.getMe);
 apiRouter.patch(
   '/me/profile',
   authenticate,
@@ -98,9 +107,16 @@ apiRouter.get('/lessons/:id', optionalAuth, LessonController.getLessonById);
 apiRouter.post('/lessons/:id/access', authenticate, lessonAccessLimiter, LessonController.requestAccess);
 apiRouter.get('/lessons/:id/stream', LessonController.streamLessonPdf);
 
-// ==================== PAIEMENTS ====================
+// ==================== PAIEMENTS & ABONNEMENTS ====================
 apiRouter.post(
   '/payments/initiate',
+  authenticate,
+  paymentLimiter,
+  validate(initiatePaymentSchema),
+  SubscriptionPaymentController.initiatePayment
+);
+apiRouter.post(
+  '/subscriptions/checkout',
   authenticate,
   paymentLimiter,
   validate(initiatePaymentSchema),
@@ -121,19 +137,26 @@ apiRouter.get('/admin/users/:id', adminAuth, AdminManagementController.getUserBy
 apiRouter.post('/admin/users/:id/suspend', adminAuth, AdminManagementController.suspendUser);
 apiRouter.post('/admin/users/:id/reactivate', adminAuth, AdminManagementController.reactivateUser);
 apiRouter.patch('/admin/users/:id/level', adminAuth, AdminManagementController.changeUserLevel);
+apiRouter.patch('/admin/users/:id/status', adminAuth, AdminManagementController.suspendUser);
 
 // Fiches
 apiRouter.post('/admin/lessons', adminAuth, validate(createLessonSchema), AdminManagementController.createLesson);
 apiRouter.patch('/admin/lessons/:id', adminAuth, validate(updateLessonSchema), AdminManagementController.updateLesson);
 apiRouter.post('/admin/lessons/:id/publish', adminAuth, AdminManagementController.publishLesson);
+apiRouter.patch('/admin/lessons/:id/publish', adminAuth, AdminManagementController.publishLesson);
 apiRouter.post('/admin/lessons/:id/unpublish', adminAuth, AdminManagementController.unpublishLesson);
+apiRouter.patch('/admin/lessons/:id/unpublish', adminAuth, AdminManagementController.unpublishLesson);
 apiRouter.delete('/admin/lessons/:id', adminAuth, AdminManagementController.archiveLesson);
+apiRouter.patch('/admin/lessons/:id/archive', adminAuth, AdminManagementController.archiveLesson);
 
 // Importation Massive
 apiRouter.post('/admin/imports', adminAuth, upload.array('files', 50), AdminOperationsController.uploadBatch);
+apiRouter.post('/admin/imports/upload', adminAuth, upload.array('files', 50), AdminOperationsController.uploadBatch);
+apiRouter.get('/admin/imports', adminAuth, AdminOperationsController.getDashboardMetrics);
 apiRouter.get('/admin/imports/:id', adminAuth, AdminOperationsController.getBatchById);
 apiRouter.post('/admin/imports/:id/confirm', adminAuth, AdminOperationsController.confirmBatch);
 
 // Dashboard & Audit
 apiRouter.get('/admin/dashboard', adminAuth, AdminOperationsController.getDashboardMetrics);
+apiRouter.get('/admin/dashboard/kpis', adminAuth, AdminOperationsController.getDashboardMetrics);
 apiRouter.get('/admin/audit', adminAuth, AdminOperationsController.getAuditLogs);
