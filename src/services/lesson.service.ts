@@ -25,7 +25,11 @@ export class LessonService {
     const filter: Record<string, unknown> = {};
 
     // 1. Visibilité : seules les fiches publiées sont visibles pour les enseignants
-    if (userRole !== ROLES.ADMIN && userRole !== ROLES.CONTENT_MANAGER) {
+    if (
+      userRole !== ROLES.SUPER_ADMIN &&
+      userRole !== ROLES.ADMIN &&
+      userRole !== ROLES.CONTENT_MANAGER
+    ) {
       filter.status = 'PUBLISHED';
     }
 
@@ -54,8 +58,12 @@ export class LessonService {
     if (query.lessonType) {
       filter.lessonType = query.lessonType;
     }
+    if (query.status && (userRole === ROLES.SUPER_ADMIN || userRole === ROLES.ADMIN || userRole === ROLES.CONTENT_MANAGER)) {
+      filter.status = query.status;
+    }
     if (query.search) {
-      filter.$text = { $search: query.search };
+      const regex = new RegExp(query.search.trim(), 'i');
+      filter.$or = [{ title: regex }, { objective: regex }, { pedagogicalSequence: regex }];
     }
 
     const page = query.page || 1;
@@ -67,7 +75,7 @@ export class LessonService {
         .populate('levelId', 'code label')
         .populate('subjectId', 'name icon')
         .populate('domainId', 'name')
-        .sort({ week: 1, order: 1, createdAt: -1 })
+        .sort({ week: 1, createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -105,6 +113,7 @@ export class LessonService {
 
     if (
       lesson.status !== 'PUBLISHED' &&
+      userRole !== ROLES.SUPER_ADMIN &&
       userRole !== ROLES.ADMIN &&
       userRole !== ROLES.CONTENT_MANAGER
     ) {

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { UserRole, Permission, ROLE_PERMISSIONS } from '../constants/roles.constants';
+import { ROLES, UserRole, Permission, ROLE_PERMISSIONS } from '../constants/roles.constants';
 import { AppError } from '../utils/app-error.utils';
 
 export function requireRole(...allowedRoles: UserRole[]) {

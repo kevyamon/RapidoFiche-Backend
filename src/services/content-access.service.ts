@@ -31,7 +31,11 @@ export class ContentAccessService {
     userLevelId: string | undefined,
     targetLevelId: string
   ): Promise<boolean> {
-    if (userRole === ROLES.ADMIN || userRole === ROLES.CONTENT_MANAGER) {
+    if (
+      userRole === ROLES.SUPER_ADMIN ||
+      userRole === ROLES.ADMIN ||
+      userRole === ROLES.CONTENT_MANAGER
+    ) {
       return true;
     }
 
@@ -54,7 +58,11 @@ export class ContentAccessService {
     }
 
     // 2. Les administrateurs et gestionnaires de contenu ont un accès total
-    if (userRole === ROLES.ADMIN || userRole === ROLES.CONTENT_MANAGER) {
+    if (
+      userRole === ROLES.SUPER_ADMIN ||
+      userRole === ROLES.ADMIN ||
+      userRole === ROLES.CONTENT_MANAGER
+    ) {
       return { allowed: true, lesson };
     }
 
