@@ -13,6 +13,7 @@ export class AdminManagementController {
     next: NextFunction
   ): Promise<void> {
     try {
+      if (!req.user) throw AppError.unauthorized();
       const page = parseInt(req.query.page as string, 10) || 1;
       const limit = parseInt(req.query.limit as string, 10) || 20;
       const search = req.query.search as string | undefined;
@@ -20,14 +21,17 @@ export class AdminManagementController {
       const status = req.query.status as string | undefined;
       const levelId = req.query.levelId as string | undefined;
 
-      const result = await AdminUserService.getUsers({
-        page,
-        limit,
-        search,
-        role,
-        status,
-        levelId,
-      });
+      const result = await AdminUserService.getUsers(
+        {
+          page,
+          limit,
+          search,
+          role,
+          status,
+          levelId,
+        },
+        req.user.role
+      );
 
       res.status(200).json({
         success: true,
@@ -45,7 +49,8 @@ export class AdminManagementController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const user = await AdminUserService.getUserById(req.params.id);
+      if (!req.user) throw AppError.unauthorized();
+      const user = await AdminUserService.getUserById(req.params.id, req.user.role);
       res.status(200).json({ success: true, data: user });
     } catch (error) {
       next(error);
@@ -59,10 +64,15 @@ export class AdminManagementController {
   ): Promise<void> {
     try {
       if (!req.user) throw AppError.unauthorized();
-      await AdminUserService.suspendUser(req.user.id, req.params.id, req.body.reason);
+      await AdminUserService.suspendUser(
+        req.user.id,
+        req.params.id,
+        req.user.role,
+        req.body.reason
+      );
       res.status(200).json({
         success: true,
-        data: { message: 'Compte enseignant suspendu avec succès' },
+        data: { message: 'Compte suspendu avec succès' },
       });
     } catch (error) {
       next(error);
@@ -76,10 +86,10 @@ export class AdminManagementController {
   ): Promise<void> {
     try {
       if (!req.user) throw AppError.unauthorized();
-      await AdminUserService.reactivateUser(req.user.id, req.params.id);
+      await AdminUserService.reactivateUser(req.user.id, req.params.id, req.user.role);
       res.status(200).json({
         success: true,
-        data: { message: 'Compte enseignant réactivé avec succès' },
+        data: { message: 'Compte réactivé avec succès' },
       });
     } catch (error) {
       next(error);
@@ -96,11 +106,12 @@ export class AdminManagementController {
       await AdminUserService.changeUserLevel(
         req.user.id,
         req.params.id,
-        req.body.primaryLevelId
+        req.body.primaryLevelId,
+        req.user.role
       );
       res.status(200).json({
         success: true,
-        data: { message: 'Niveau de l’enseignant mis à jour avec succès' },
+        data: { message: 'Niveau de l’utilisateur mis à jour avec succès' },
       });
     } catch (error) {
       next(error);

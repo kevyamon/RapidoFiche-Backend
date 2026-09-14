@@ -1,7 +1,8 @@
 export const ROLES = {
-  TEACHER: 'TEACHER',
+  SUPER_ADMIN: 'SUPER_ADMIN',
   ADMIN: 'ADMIN',
   CONTENT_MANAGER: 'CONTENT_MANAGER',
+  TEACHER: 'TEACHER',
 } as const;
 
 export type UserRole = (typeof ROLES)[keyof typeof ROLES];
@@ -22,12 +23,13 @@ export const PERMISSIONS = {
   LESSONS_MANAGE: 'lessons.manage',
   IMPORT_MANAGE: 'import.manage',
 
-  // Administration Globale (Admin uniquement)
+  // Administration Globale (Admin & SuperAdmin)
   USERS_MANAGE: 'admin.users.manage',
   SUBSCRIPTIONS_MANAGE: 'admin.subscriptions.manage',
   PAYMENTS_MANAGE: 'admin.payments.manage',
   STATS_READ: 'admin.stats.read',
   AUDIT_READ: 'admin.audit.read',
+  ADMINS_MANAGE: 'admin.admins.manage',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -69,4 +71,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     PERMISSIONS.STATS_READ,
     PERMISSIONS.AUDIT_READ,
   ],
+  [ROLES.SUPER_ADMIN]: Object.values(PERMISSIONS),
 };
+

@@ -5,6 +5,7 @@ import { AuditService } from './audit.service';
 import { PaginationMeta } from '../contracts/api.types';
 import { AppError } from '../utils/app-error.utils';
 import { ERROR_CODES } from '../constants/errors.constants';
+import { ROLES, UserRole } from '../constants/roles.constants';
 
 export interface QueryUsersInput {
   page?: number;
@@ -17,13 +18,20 @@ export interface QueryUsersInput {
 
 export class AdminUserService {
   public static async getUsers(
-    query: QueryUsersInput
+    query: QueryUsersInput,
+    requesterRole?: UserRole
   ): Promise<{ users: IUserDocument[]; pagination: PaginationMeta }> {
     const filter: Record<string, unknown> = {};
 
-    if (query.role) {
+    // Si le demandeur n'est pas SUPER_ADMIN, il ne peut absolument pas voir les Superadmins
+    if (requesterRole !== ROLES.SUPER_ADMIN) {
+      filter.role = query.role && query.role !== ROLES.SUPER_ADMIN
+        ? query.role
+        : { $ne: ROLES.SUPER_ADMIN };
+    } else if (query.role) {
       filter.role = query.role;
     }
+
     if (query.status) {
       filter.status = query.status;
     }
@@ -64,12 +72,20 @@ export class AdminUserService {
     };
   }
 
-  public static async getUserById(userId: string): Promise<IUserDocument> {
+  public static async getUserById(
+    userId: string,
+    requesterRole?: UserRole
+  ): Promise<IUserDocument> {
     const user = await UserModel.findById(userId)
       .populate('primaryLevelId', 'code label')
       .lean();
 
     if (!user) {
+      throw new AppError(ERROR_CODES.ACCOUNT_NOT_FOUND, 'Utilisateur introuvable', 404);
+    }
+
+    // Leurre : si le compte est SUPER_ADMIN et que le demandeur ne l'est pas, renvoyer 404
+    if (user.role === ROLES.SUPER_ADMIN && requesterRole !== ROLES.SUPER_ADMIN) {
       throw new AppError(ERROR_CODES.ACCOUNT_NOT_FOUND, 'Utilisateur introuvable', 404);
     }
 
@@ -79,6 +95,7 @@ export class AdminUserService {
   public static async suspendUser(
     adminId: string,
     userId: string,
+    requesterRole?: UserRole,
     reason?: string
   ): Promise<void> {
     const user = await UserModel.findById(userId);
@@ -86,30 +103,71 @@ export class AdminUserService {
       throw new AppError(ERROR_CODES.ACCOUNT_NOT_FOUND, 'Utilisateur introuvable', 404);
     }
 
+    // Protection forteresse : seul le SUPER_ADMIN peut agir sur un admin ou un superadmin
+    if (user.role === ROLES.SUPER_ADMIN) {
+      throw new AppError(
+        ERROR_CODES.AUTH_REQUIRED,
+        'Impossible de modifier le compte du Super-Administrateur',
+        403
+      );
+    }
+
+    if (user.role === ROLES.ADMIN && requesterRole !== ROLES.SUPER_ADMIN) {
+      throw new AppError(
+        ERROR_CODES.AUTH_REQUIRED,
+        'Seul le Super-Administrateur peut suspendre un administrateur',
+        403
+      );
+    }
+
     user.status = 'SUSPENDED';
     await user.save();
 
     await AuditService.logAction(adminId, 'USER_SUSPENDED', 'User', userId, {
+      targetRole: user.role,
       reason: reason || 'Suspension administrative',
     });
   }
 
-  public static async reactivateUser(adminId: string, userId: string): Promise<void> {
+  public static async reactivateUser(
+    adminId: string,
+    userId: string,
+    requesterRole?: UserRole
+  ): Promise<void> {
     const user = await UserModel.findById(userId);
     if (!user) {
       throw new AppError(ERROR_CODES.ACCOUNT_NOT_FOUND, 'Utilisateur introuvable', 404);
     }
 
+    if (user.role === ROLES.SUPER_ADMIN) {
+      throw new AppError(
+        ERROR_CODES.AUTH_REQUIRED,
+        'Action non autorisée sur ce compte',
+        403
+      );
+    }
+
+    if (user.role === ROLES.ADMIN && requesterRole !== ROLES.SUPER_ADMIN) {
+      throw new AppError(
+        ERROR_CODES.AUTH_REQUIRED,
+        'Seul le Super-Administrateur peut réactiver un administrateur',
+        403
+      );
+    }
+
     user.status = 'ACTIVE';
     await user.save();
 
-    await AuditService.logAction(adminId, 'USER_REACTIVATED', 'User', userId);
+    await AuditService.logAction(adminId, 'USER_REACTIVATED', 'User', userId, {
+      targetRole: user.role,
+    });
   }
 
   public static async changeUserLevel(
     adminId: string,
     userId: string,
-    newLevelId: string
+    newLevelId: string,
+    requesterRole?: UserRole
   ): Promise<void> {
     const level = await EducationLevelModel.findById(newLevelId);
     if (!level) {
@@ -119,6 +177,14 @@ export class AdminUserService {
     const user = await UserModel.findById(userId);
     if (!user) {
       throw new AppError(ERROR_CODES.ACCOUNT_NOT_FOUND, 'Utilisateur introuvable', 404);
+    }
+
+    if (user.role === ROLES.SUPER_ADMIN || (user.role === ROLES.ADMIN && requesterRole !== ROLES.SUPER_ADMIN)) {
+      throw new AppError(
+        ERROR_CODES.AUTH_REQUIRED,
+        'Action non autorisée sur ce profil',
+        403
+      );
     }
 
     const previousLevelId = user.primaryLevelId?.toString();

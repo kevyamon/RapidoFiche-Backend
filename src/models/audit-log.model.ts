@@ -10,6 +10,8 @@ export const AUDIT_ACTIONS = [
   'LESSON_ARCHIVED',
   'IMPORT_CONFIRMED',
   'LEVEL_CHANGED',
+  'ADMIN_REGISTERED',
+  'ADMIN_LOGIN',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

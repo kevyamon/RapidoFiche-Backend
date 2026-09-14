@@ -34,6 +34,13 @@ import {
   geniusPayWebhookSchema,
 } from '../schemas/subscription-payment.schema';
 
+import { AdminAuthController } from '../controllers/admin-auth.controller';
+import {
+  adminRegisterSchema,
+  adminLoginSchema,
+  adminGoogleAuthSchema,
+} from '../schemas/admin-auth.schema';
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024 }, // Max 25 Mo par fichier PDF
@@ -56,13 +63,33 @@ const validate =
 
 export const apiRouter = Router();
 
-// ==================== AUTHENTIFICATION ====================
+// ==================== AUTHENTIFICATION ENSEIGNANT ====================
 apiRouter.post('/auth/register', authLimiter, validate(registerSchema), AuthController.register);
 apiRouter.post('/auth/login', authLimiter, validate(loginSchema), AuthController.login);
 apiRouter.post('/auth/google', authLimiter, validate(googleAuthSchema), AuthController.googleAuth);
 apiRouter.post('/auth/refresh', AuthController.refresh);
 apiRouter.post('/auth/logout', AuthController.logout);
 apiRouter.get('/auth/me', authenticate, AuthController.getMe);
+
+// ==================== AUTHENTIFICATION ADMINISTRATIVE FURTIVE ====================
+apiRouter.post(
+  '/admin/auth/register',
+  authLimiter,
+  validate(adminRegisterSchema),
+  AdminAuthController.register
+);
+apiRouter.post(
+  '/admin/auth/login',
+  authLimiter,
+  validate(adminLoginSchema),
+  AdminAuthController.login
+);
+apiRouter.post(
+  '/admin/auth/google',
+  authLimiter,
+  validate(adminGoogleAuthSchema),
+  AdminAuthController.googleAuth
+);
 
 // ==================== RÉFÉRENTIEL PÉDAGOGIQUE ====================
 apiRouter.get('/cycles', PedagogyController.getCycles);

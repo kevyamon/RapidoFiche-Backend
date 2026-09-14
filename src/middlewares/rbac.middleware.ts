@@ -8,6 +8,10 @@ export function requireRole(...allowedRoles: UserRole[]) {
       return next(AppError.unauthorized());
     }
 
+    if (req.user.role === ROLES.SUPER_ADMIN) {
+      return next();
+    }
+
     if (!allowedRoles.includes(req.user.role)) {
       return next(
         AppError.forbidden(
@@ -24,6 +28,10 @@ export function requirePermission(...requiredPermissions: Permission[]) {
   return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.user) {
       return next(AppError.unauthorized());
+    }
+
+    if (req.user.role === ROLES.SUPER_ADMIN) {
+      return next();
     }
 
     const userPermissions = ROLE_PERMISSIONS[req.user.role] || [];

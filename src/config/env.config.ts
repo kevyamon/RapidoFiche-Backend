@@ -47,6 +47,16 @@ const envSchema = z.object({
 
   // Google OAuth
   GOOGLE_CLIENT_ID: z.string().optional().default(''),
+
+  // Administration Furtive & Superadmin
+  ADMIN_PW: z
+    .string()
+    .min(8, 'ADMIN_PW doit contenir au moins 8 caractères')
+    .default('cle_secrete_maitre_staff_2026_securisee'),
+  SA_MAIL: z
+    .string()
+    .email('SA_MAIL doit être une adresse email valide')
+    .default('superadmin@rapidofiche.ci'),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
