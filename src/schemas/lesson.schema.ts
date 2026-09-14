@@ -108,6 +108,9 @@ export const queryLessonsSchema = z.object({
     term: z.coerce.number().int().min(1).max(4).optional(),
     schoolYear: z.string().trim().optional(),
     lessonType: z.string().trim().optional(),
+    status: z
+      .enum(['DRAFT', 'READY_FOR_REVIEW', 'PUBLISHED', 'ARCHIVED'])
+      .optional(),
     search: z.string().trim().optional(),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
