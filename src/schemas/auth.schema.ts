@@ -20,14 +20,13 @@ export const registerSchema = z.object({
       .toLowerCase()
       .email('L’adresse email fournie n’est pas valide'),
     phone: z
-      .string()
+      .string({ required_error: 'Le numéro de téléphone est obligatoire' })
       .trim()
+      .min(8, 'Le numéro de téléphone doit comporter au moins 8 chiffres')
       .regex(
         /^[0-9+\s-]{8,20}$/,
-        'Le numéro de téléphone doit être valide (ex: +225 0700000000)'
-      )
-      .optional()
-      .or(z.literal('')),
+        'Le numéro de téléphone doit être valide (ex: 0708091011 ou +225...)'
+      ),
     password: z
       .string()
       .min(8, 'Le mot de passe doit comporter au moins 8 caractères'),
