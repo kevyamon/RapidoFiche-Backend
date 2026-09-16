@@ -50,6 +50,19 @@ export class AdminOperationsController {
     }
   }
 
+  public static async getBatches(
+    _req: Request,
+    res: Response<ApiSuccessResponse<unknown>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const batches = await ImportBatchService.getBatches();
+      res.status(200).json({ success: true, data: batches });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   public static async getBatchById(
     req: Request,
     res: Response<ApiSuccessResponse<unknown>>,

@@ -108,6 +108,13 @@ export class ImportBatchService {
     });
   }
 
+  public static async getBatches(): Promise<IImportBatchDocument[]> {
+    return (await ImportBatchModel.find()
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean()) as unknown as IImportBatchDocument[];
+  }
+
   public static async getBatchById(batchId: string): Promise<IImportBatchDocument> {
     const batch = await ImportBatchModel.findById(batchId)
       .populate('files.parsedData.levelId', 'code label')

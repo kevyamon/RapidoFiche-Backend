@@ -179,7 +179,7 @@ apiRouter.patch('/admin/lessons/:id/archive', adminAuth, AdminManagementControll
 // Importation Massive
 apiRouter.post('/admin/imports', adminAuth, upload.array('files', 50), AdminOperationsController.uploadBatch);
 apiRouter.post('/admin/imports/upload', adminAuth, upload.array('files', 50), AdminOperationsController.uploadBatch);
-apiRouter.get('/admin/imports', adminAuth, AdminOperationsController.getDashboardMetrics);
+apiRouter.get('/admin/imports', adminAuth, AdminOperationsController.getBatches);
 apiRouter.get('/admin/imports/:id', adminAuth, AdminOperationsController.getBatchById);
 apiRouter.post('/admin/imports/:id/confirm', adminAuth, AdminOperationsController.confirmBatch);
 
