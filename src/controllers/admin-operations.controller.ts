@@ -32,9 +32,13 @@ export class AdminOperationsController {
         sizeBytes: f.size,
       }));
 
+      const primaryLevelId = (req.body.primaryLevelId || req.body.levelId) as string | undefined;
+      const subjectId = req.body.subjectId as string | undefined;
+
       const batch = await ImportBatchService.processUploadedFiles(
         req.user.id,
-        uploadInputs
+        uploadInputs,
+        { primaryLevelId, subjectId }
       );
 
       res.status(201).json({

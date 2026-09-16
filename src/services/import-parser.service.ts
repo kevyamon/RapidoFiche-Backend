@@ -12,74 +12,81 @@ export interface ParsedFileInfo {
   isCompliant: boolean;
 }
 
-const SUBJECT_ALIASES: Record<string, string> = {
-  maths: 'Mathématiques',
-  mathematiques: 'Mathématiques',
-  calcul: 'Mathématiques',
-  francais: 'Français',
-  lecture: 'Français',
-  ecriture: 'Français',
-  sciences: 'Sciences et Technologie',
-  histoire: 'Histoire-Géographie',
-  geo: 'Histoire-Géographie',
-  edhc: 'EDHC',
-  anglais: 'Anglais',
-  eps: 'EPS',
-  art: 'Arts Plastiques',
-};
+// Dictionnaire de correspondances pédagogiques (ordonné par spécificité décroissante)
+const COMPOUND_SUBJECT_PATTERNS: Array<{ regex: RegExp; standardName: string }> = [
+  { regex: /\b(?:histoire[\s_-]*g[eé]o(?:graphie)?|hg)\b/i, standardName: 'Histoire-Géographie' },
+  { regex: /\b(?:exploitation\s+de\s+(?:texte|t)|expression\s+[eé]crite|orthographe|grammaire|vocabulaire|po[eé]sie|conjugaison)\b/i, standardName: 'Français' },
+  { regex: /\b(?:sciences?(?:\s+et\s+techno(?:logie)?)?|svt|physique(?:\s+chimie)?)\b/i, standardName: 'Sciences et Technologie' },
+  { regex: /\b(?:arts?\s+plastiques?|a\.?e\.?c\.?|dessin)\b/i, standardName: 'Arts Plastiques' },
+  { regex: /\b(?:[eé]ducation\s+civique|edhc)\b/i, standardName: 'EDHC' },
+  { regex: /\b(?:math[eé]matiques?|maths?|calcul|arithm[eé]tique|g[eé]om[eé]trie)\b/i, standardName: 'Mathématiques' },
+  { regex: /\b(?:fran[cç]ais|[eé]criture|lecture)\b/i, standardName: 'Français' },
+  { regex: /\b(?:anglais|english)\b/i, standardName: 'Anglais' },
+  { regex: /\b(?:e\.?p\.?s\.?|[eé]ducation\s+physique|sport)\b/i, standardName: 'EPS' },
+];
 
 export class ImportParserService {
   public static parseFileName(fileName: string): ParsedFileInfo {
     const baseName = path.parse(fileName).name;
-    const parts = baseName.split(/[_ -]+/);
+    const cleanStr = baseName.replace(/[._-]+/g, ' ').trim();
 
     let levelCode: EducationLevelCode | undefined;
     let subjectKeyword: string | undefined;
     let week: number | undefined;
-    const topicParts: string[] = [];
 
-    for (const part of parts) {
-      const upperPart = part.toUpperCase();
-      const lowerPart = part.toLowerCase();
-
-      // 1. Détection du Niveau
-      if (
-        !levelCode &&
-        EDUCATION_LEVEL_CODES.includes(upperPart as EducationLevelCode)
-      ) {
-        levelCode = upperPart as EducationLevelCode;
-        continue;
+    // 1. Détection du Niveau (CP1, CP2, CE1, CE2, CM1, CM2)
+    for (const code of EDUCATION_LEVEL_CODES) {
+      const levelRegex = new RegExp(`\\b${code}\\b`, 'i');
+      if (levelRegex.test(cleanStr)) {
+        levelCode = code;
+        break;
       }
-
-      // 2. Détection de la Semaine (ex: Semaine12, S12, W12)
-      const weekMatch = lowerPart.match(/^(?:semaine|sem|s|w)([0-9]{1,2})$/);
-      if (!week && weekMatch) {
-        const parsedWeek = parseInt(weekMatch[1], 10);
-        if (parsedWeek >= 1 && parsedWeek <= 52) {
-          week = parsedWeek;
-          continue;
-        }
-      }
-
-      // 3. Détection de la Matière
-      if (!subjectKeyword && SUBJECT_ALIASES[lowerPart]) {
-        subjectKeyword = SUBJECT_ALIASES[lowerPart];
-        continue;
-      }
-
-      // 4. Reste = Thème / Titre
-      topicParts.push(part);
     }
 
-    const topic = topicParts.length > 0 ? topicParts.join(' ') : undefined;
-    const isCompliant = !!(levelCode && (subjectKeyword || topic));
-
-    let suggestedTitle = baseName.replace(/_/g, ' ');
-    if (levelCode && subjectKeyword && week) {
-      suggestedTitle = `${subjectKeyword} - ${levelCode} - Semaine ${week}${topic ? ` : ${topic}` : ''}`;
-    } else if (levelCode && subjectKeyword) {
-      suggestedTitle = `${subjectKeyword} - ${levelCode}${topic ? ` : ${topic}` : ''}`;
+    // 2. Détection de la Semaine (ex: Semaine 12, Sem12, S12, W12)
+    const weekMatch = cleanStr.match(/\b(?:semaine|sem|s|w)\s*([0-9]{1,2})\b/i);
+    if (weekMatch) {
+      const parsedWeek = parseInt(weekMatch[1], 10);
+      if (parsedWeek >= 1 && parsedWeek <= 52) {
+        week = parsedWeek;
+      }
     }
+
+    // 3. Détection de la Matière via les patterns ordonnés
+    for (const pattern of COMPOUND_SUBJECT_PATTERNS) {
+      if (pattern.regex.test(cleanStr)) {
+        subjectKeyword = pattern.standardName;
+        break;
+      }
+    }
+
+    // 4. Nettoyage du titre : suppression des bruits et artefacts fréquents
+    let cleanedTitle = cleanStr
+      // Supprimer timestamps (ex: 221028 101140)
+      .replace(/\b\d{6,8}\s+\d{6}\b/g, '')
+      // Supprimer mentions "recadrée", "ok", "ok-1", "tome 1", "partie 1", "page"
+      .replace(/\b(?:recadr[eé]e?|ok\b(?:\s*\d+)?|partie\s*\d+|tome\s*\d+|version\s*\d+|copie)\b/gi, '')
+      // Supprimer le code de classe et la semaine déjà extraits
+      .replace(new RegExp(`\\b(?:CP1|CP2|CE1|CE2|CM1|CM2)\\b`, 'gi'), '')
+      .replace(/\b(?:semaine|sem|s|w)\s*[0-9]{1,2}\b/gi, '')
+      // Supprimer les mots de matière du titre s'ils sont déjà reconnus
+      .replace(/\b(?:histoire|g[eé]o(?:graphie)?|hg|maths?|math[eé]matiques?|calcul|sciences?|techno(?:logie)?|fran[cç]ais|edhc|[eé]criture|lecture|anglais|eps|dessin)\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // 5. Construction d'un titre pédagogique harmonisé
+    let suggestedTitle = '';
+    if (subjectKeyword && levelCode) {
+      suggestedTitle = `${subjectKeyword} - ${levelCode}`;
+      if (week) suggestedTitle += ` - Semaine ${week}`;
+      if (cleanedTitle.length > 2) suggestedTitle += ` : ${cleanedTitle}`;
+    } else if (subjectKeyword) {
+      suggestedTitle = subjectKeyword + (cleanedTitle.length > 2 ? ` : ${cleanedTitle}` : '');
+    } else {
+      suggestedTitle = baseName.replace(/[._-]+/g, ' ').trim();
+    }
+
+    const isCompliant = !!(levelCode && subjectKeyword);
 
     return {
       fileName,
@@ -87,7 +94,7 @@ export class ImportParserService {
       levelCode,
       subjectKeyword,
       week,
-      topic,
+      topic: cleanedTitle.length > 2 ? cleanedTitle : undefined,
       suggestedTitle,
       isCompliant,
     };

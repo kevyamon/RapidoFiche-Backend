@@ -6,7 +6,7 @@ import { ApiSuccessResponse } from '../contracts/api.types';
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: env.isProduction,
-  sameSite: (env.isProduction ? 'strict' : 'lax') as 'strict' | 'lax',
+  sameSite: (env.isProduction ? 'none' : 'lax') as 'none' | 'lax',
   maxAge: 30 * 24 * 60 * 60 * 1000, // 30 jours
 };
 

@@ -142,7 +142,7 @@ export class LessonService {
     });
 
     // Enregistrement automatique dans l'historique sans bloquer la réponse
-    FavoriteHistoryService.recordView(userId, lessonId).catch(() => {});
+    FavoriteHistoryService.recordView(userId, lessonId).catch(() => { });
 
     return {
       lessonId: lesson.id,

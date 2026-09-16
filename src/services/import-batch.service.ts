@@ -12,7 +12,8 @@ import { ERROR_CODES } from '../constants/errors.constants';
 export class ImportBatchService {
   public static async processUploadedFiles(
     adminId: string,
-    files: UploadFileInput[]
+    files: UploadFileInput[],
+    options?: { primaryLevelId?: string; subjectId?: string }
   ): Promise<IImportBatchDocument> {
     if (!files || files.length === 0) {
       throw new AppError(ERROR_CODES.INVALID_FILE, 'Aucun fichier fourni', 400);
@@ -22,30 +23,53 @@ export class ImportBatchService {
     let processed = 0;
     let failed = 0;
 
+    let explicitLevelDoc: { _id: Types.ObjectId; code: string } | null = null;
+    let explicitSubjectDoc: { _id: Types.ObjectId; name: string } | null = null;
+
+    if (options?.primaryLevelId && Types.ObjectId.isValid(options.primaryLevelId)) {
+      explicitLevelDoc = await EducationLevelModel.findById(options.primaryLevelId).lean();
+    }
+    if (options?.subjectId && Types.ObjectId.isValid(options.subjectId)) {
+      explicitSubjectDoc = await SubjectModel.findById(options.subjectId).lean();
+    }
+
     for (const file of files) {
       try {
         const asset = await StorageService.uploadPrivatePdf(file);
         const parsed = ImportParserService.parseFileName(file.originalName);
 
-        let levelId: Types.ObjectId | undefined;
-        let subjectId: Types.ObjectId | undefined;
+        let levelId: Types.ObjectId | undefined = explicitLevelDoc
+          ? new Types.ObjectId(explicitLevelDoc._id.toString())
+          : undefined;
+        let levelCode: string | undefined = explicitLevelDoc ? explicitLevelDoc.code : parsed.levelCode;
 
-        if (parsed.levelCode) {
+        if (!levelId && parsed.levelCode) {
           const levelDoc = await EducationLevelModel.findOne({ code: parsed.levelCode }).lean();
           if (levelDoc) {
             levelId = new Types.ObjectId(levelDoc._id.toString());
+            levelCode = levelDoc.code;
           }
         }
 
-        if (parsed.subjectKeyword && levelId) {
+        let subjectId: Types.ObjectId | undefined = explicitSubjectDoc
+          ? new Types.ObjectId(explicitSubjectDoc._id.toString())
+          : undefined;
+        let subjectName: string | undefined = explicitSubjectDoc ? explicitSubjectDoc.name : parsed.subjectKeyword;
+
+        if (!subjectId && parsed.subjectKeyword && levelId) {
           const subjectDoc = await SubjectModel.findOne({
             name: new RegExp(parsed.subjectKeyword, 'i'),
             levelIds: levelId,
           }).lean();
           if (subjectDoc) {
             subjectId = new Types.ObjectId(subjectDoc._id.toString());
+            subjectName = subjectDoc.name;
           }
         }
+
+        const title =
+          parsed.suggestedTitle ||
+          `${subjectName || 'Fiche'} - ${levelCode || ''}`.trim();
 
         batchItems.push({
           fileName: asset.storageKey,
@@ -53,13 +77,13 @@ export class ImportBatchService {
           status: 'PARSED',
           assetId: new Types.ObjectId(asset.id),
           parsedData: {
-            levelCode: parsed.levelCode,
+            levelCode: levelCode as any,
             levelId,
-            subjectName: parsed.subjectKeyword,
+            subjectName,
             subjectId,
             week: parsed.week,
             topic: parsed.topic,
-            title: parsed.suggestedTitle,
+            title,
           },
         });
         processed++;
