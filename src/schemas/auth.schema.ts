@@ -67,8 +67,18 @@ export const refreshTokenSchema = z.object({
 
 export const updateProfileSchema = z.object({
   body: z.object({
-    firstName: z.string().trim().min(2).max(100).optional(),
-    lastName: z.string().trim().min(2).max(100).optional(),
+    firstName: z
+      .string()
+      .trim()
+      .min(2, 'Le prénom doit comporter au moins 2 caractères')
+      .max(100, 'Le prénom ne peut dépasser 100 caractères')
+      .optional(),
+    lastName: z
+      .string()
+      .trim()
+      .min(2, 'Le nom doit comporter au moins 2 caractères')
+      .max(100, 'Le nom ne peut dépasser 100 caractères')
+      .optional(),
     email: z
       .string()
       .trim()
@@ -78,22 +88,28 @@ export const updateProfileSchema = z.object({
     phone: z
       .string()
       .trim()
-      .regex(/^[0-9+\s-]{8,20}$/, 'Format de numéro invalide')
+      .refine((val) => !val || /^[0-9+\s-]{8,20}$/.test(val), {
+        message: 'Le format du numéro de téléphone est invalide (ex: 0768388770 ou +225...)',
+      })
       .optional()
       .nullable()
       .or(z.literal('')),
     phoneNumber: z
       .string()
       .trim()
-      .regex(/^[0-9+\s-]{8,20}$/, 'Format de numéro invalide')
+      .refine((val) => !val || /^[0-9+\s-]{8,20}$/.test(val), {
+        message: 'Le format du numéro de téléphone est invalide (ex: 0768388770 ou +225...)',
+      })
       .optional()
       .nullable()
       .or(z.literal('')),
     avatarUrl: z.string().trim().optional().nullable().or(z.literal('')),
     primaryLevelId: z
       .string()
-      .min(2, 'L’identifiant du niveau est invalide')
-      .optional(),
+      .trim()
+      .optional()
+      .nullable()
+      .or(z.literal('')),
   }),
 });
 

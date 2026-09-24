@@ -43,15 +43,16 @@ export class UserProfileService {
     if (finalPhone !== undefined) user.phone = finalPhone || undefined;
     if (input.avatarUrl !== undefined) user.avatarUrl = input.avatarUrl || undefined;
 
-    if (input.primaryLevelId) {
+    if (input.primaryLevelId && input.primaryLevelId.trim().length > 0) {
+      const trimmedLevelId = input.primaryLevelId.trim();
       const isObjectId =
-        Types.ObjectId.isValid(input.primaryLevelId) &&
-        input.primaryLevelId.length === 24;
+        Types.ObjectId.isValid(trimmedLevelId) &&
+        trimmedLevelId.length === 24;
 
       const level = await EducationLevelModel.findOne({
         $or: [
-          ...(isObjectId ? [{ _id: new Types.ObjectId(input.primaryLevelId) }] : []),
-          { code: input.primaryLevelId.toUpperCase() },
+          ...(isObjectId ? [{ _id: new Types.ObjectId(trimmedLevelId) }] : []),
+          { code: trimmedLevelId.toUpperCase() },
         ],
       }).lean();
 

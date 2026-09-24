@@ -112,6 +112,7 @@ export class PaymentService {
 
     const isSuccess =
       payload.event === 'payment.completed' ||
+      payload.event === 'payment.success' ||
       paymentData.status.toLowerCase() === 'completed' ||
       paymentData.status.toLowerCase() === 'success';
 

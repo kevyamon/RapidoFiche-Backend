@@ -26,19 +26,25 @@ export const initiatePaymentSchema = z.object({
 });
 
 export const geniusPayWebhookSchema = z.object({
-  body: z.object({
-    event: z.string().min(1),
-    data: z.object({
-      payment: z.object({
-        id: z.string().min(1),
-        reference: z.string().min(1),
-        amount: z.number().nonnegative(),
-        status: z.string().min(1),
-        currency: z.string().optional(),
-        metadata: z.record(z.unknown()).optional(),
-      }),
-    }),
-  }),
+  body: z
+    .object({
+      event: z.string().min(1),
+      data: z
+        .object({
+          payment: z
+            .object({
+              id: z.string().optional(),
+              reference: z.string().min(1),
+              amount: z.number().optional(),
+              status: z.string().min(1),
+              currency: z.string().optional(),
+              metadata: z.record(z.unknown()).optional(),
+            })
+            .passthrough(),
+        })
+        .passthrough(),
+    })
+    .passthrough(),
 });
 
 export const updateSubscriptionAdminSchema = z.object({
