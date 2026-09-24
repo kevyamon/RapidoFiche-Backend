@@ -1,5 +1,7 @@
 import { Types } from 'mongoose';
 import { LessonModel, ILessonDocument } from '../models/lesson.model';
+import { EducationLevelModel } from '../models/education-level.model';
+import { SubjectModel } from '../models/subject.model';
 import { CreateLessonInput, UpdateLessonInput } from '../schemas/lesson.schema';
 import { AuditService } from './audit.service';
 import { AppError } from '../utils/app-error.utils';
@@ -41,8 +43,32 @@ export class AdminLessonService {
     }
 
     if (input.title) lesson.title = input.title;
-    if (input.levelId) lesson.levelId = new Types.ObjectId(input.levelId);
-    if (input.subjectId) lesson.subjectId = new Types.ObjectId(input.subjectId);
+
+    if (input.levelId) {
+      const isOid = Types.ObjectId.isValid(input.levelId) && input.levelId.length === 24;
+      const levelDoc = await EducationLevelModel.findOne({
+        $or: [
+          ...(isOid ? [{ _id: new Types.ObjectId(input.levelId) }] : []),
+          { code: input.levelId.toUpperCase() },
+        ],
+      }).lean();
+      if (levelDoc) {
+        lesson.levelId = levelDoc._id;
+      }
+    }
+
+    if (input.subjectId) {
+      const isOid = Types.ObjectId.isValid(input.subjectId) && input.subjectId.length === 24;
+      const subjectDoc = await SubjectModel.findOne({
+        $or: [
+          ...(isOid ? [{ _id: new Types.ObjectId(input.subjectId) }] : []),
+          { name: new RegExp(input.subjectId, 'i') },
+        ],
+      }).lean();
+      if (subjectDoc) {
+        lesson.subjectId = subjectDoc._id;
+      }
+    }
     if (input.domainId !== undefined) {
       lesson.domainId = input.domainId ? new Types.ObjectId(input.domainId) : undefined;
     }

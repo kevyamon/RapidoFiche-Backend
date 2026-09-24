@@ -62,9 +62,9 @@ export const updateLessonSchema = z.object({
   body: z
     .object({
       title: z.string().trim().min(3).max(200).optional(),
-      levelId: z.string().regex(OBJECT_ID_REGEX).optional(),
-      subjectId: z.string().regex(OBJECT_ID_REGEX).optional(),
-      domainId: z.string().regex(OBJECT_ID_REGEX).optional().nullable(),
+      levelId: z.string().trim().min(2).optional(),
+      subjectId: z.string().trim().min(2).optional(),
+      domainId: z.string().optional().nullable(),
       term: z.coerce.number().int().min(1).max(4).optional().nullable(),
       week: z.coerce.number().int().min(1).max(52).optional().nullable(),
       periodLabel: z.string().trim().optional().nullable(),
