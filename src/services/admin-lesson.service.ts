@@ -94,6 +94,10 @@ export class AdminLessonService {
     adminId: string,
     lessonId: string
   ): Promise<ILessonDocument> {
+    if (!lessonId || !Types.ObjectId.isValid(lessonId)) {
+      throw new AppError(ERROR_CODES.LESSON_NOT_FOUND, 'Identifiant de fiche invalide', 400);
+    }
+
     const lesson = await LessonModel.findById(lessonId);
     if (!lesson) {
       throw new AppError(ERROR_CODES.LESSON_NOT_FOUND, 'Fiche introuvable', 404);
@@ -114,6 +118,10 @@ export class AdminLessonService {
     adminId: string,
     lessonId: string
   ): Promise<ILessonDocument> {
+    if (!lessonId || !Types.ObjectId.isValid(lessonId)) {
+      throw new AppError(ERROR_CODES.LESSON_NOT_FOUND, 'Identifiant de fiche invalide', 400);
+    }
+
     const lesson = await LessonModel.findById(lessonId);
     if (!lesson) {
       throw new AppError(ERROR_CODES.LESSON_NOT_FOUND, 'Fiche introuvable', 404);
@@ -130,6 +138,10 @@ export class AdminLessonService {
     adminId: string,
     lessonId: string
   ): Promise<ILessonDocument> {
+    if (!lessonId || !Types.ObjectId.isValid(lessonId)) {
+      throw new AppError(ERROR_CODES.LESSON_NOT_FOUND, 'Identifiant de fiche invalide', 400);
+    }
+
     const lesson = await LessonModel.findById(lessonId);
     if (!lesson) {
       throw new AppError(ERROR_CODES.LESSON_NOT_FOUND, 'Fiche introuvable', 404);

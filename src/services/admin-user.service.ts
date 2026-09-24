@@ -58,9 +58,13 @@ export class AdminUserService {
     ]);
 
     const totalPages = Math.ceil(total / limit) || 1;
+    const normalizedUsers = users.map((u: any) => ({
+      ...u,
+      id: u._id?.toString() || u.id,
+    }));
 
     return {
-      users: users as unknown as IUserDocument[],
+      users: normalizedUsers as unknown as IUserDocument[],
       pagination: {
         page,
         limit,
@@ -89,7 +93,10 @@ export class AdminUserService {
       throw new AppError(ERROR_CODES.ACCOUNT_NOT_FOUND, 'Utilisateur introuvable', 404);
     }
 
-    return user as unknown as IUserDocument;
+    return {
+      ...user,
+      id: (user as any)._id?.toString() || (user as any).id,
+    } as unknown as IUserDocument;
   }
 
   public static async suspendUser(

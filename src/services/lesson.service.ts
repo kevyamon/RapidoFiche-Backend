@@ -83,9 +83,13 @@ export class LessonService {
     ]);
 
     const totalPages = Math.ceil(total / limit) || 1;
+    const normalizedLessons = lessons.map((l: any) => ({
+      ...l,
+      id: l._id?.toString() || l.id,
+    }));
 
     return {
-      lessons: lessons as unknown as ILessonDocument[],
+      lessons: normalizedLessons as unknown as ILessonDocument[],
       pagination: {
         page,
         limit,
@@ -120,7 +124,10 @@ export class LessonService {
       throw new AppError(ERROR_CODES.LESSON_NOT_AVAILABLE, 'Fiche non disponible', 403);
     }
 
-    return lesson as unknown as ILessonDocument;
+    return {
+      ...lesson,
+      id: (lesson as any)._id?.toString() || (lesson as any).id,
+    } as unknown as ILessonDocument;
   }
 
   public static async requestLessonAccess(
