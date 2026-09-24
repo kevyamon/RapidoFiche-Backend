@@ -20,6 +20,8 @@ export interface DashboardMetrics {
   lessons: {
     total: number;
     published: number;
+    drafts: number;
+    archived: number;
   };
   recentActivity: unknown[];
 }
@@ -37,6 +39,8 @@ export class AdminDashboardService {
       revenueResult,
       totalLessons,
       publishedLessons,
+      draftLessons,
+      archivedLessons,
       recentActivity,
     ] = await Promise.all([
       // 1. Enseignants
@@ -74,6 +78,8 @@ export class AdminDashboardService {
       // 4. Fiches
       LessonModel.countDocuments({ status: { $ne: 'ARCHIVED' } }),
       LessonModel.countDocuments({ status: 'PUBLISHED' }),
+      LessonModel.countDocuments({ status: 'DRAFT' }),
+      LessonModel.countDocuments({ status: 'ARCHIVED' }),
 
       // 5. Activité récente (Audit logs)
       AuditLogModel.find()
@@ -103,6 +109,8 @@ export class AdminDashboardService {
       lessons: {
         total: totalLessons,
         published: publishedLessons,
+        drafts: draftLessons,
+        archived: archivedLessons,
       },
       recentActivity,
     };
