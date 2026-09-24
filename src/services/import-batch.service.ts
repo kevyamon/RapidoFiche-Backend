@@ -26,35 +26,53 @@ export class ImportBatchService {
     let explicitLevelDoc: { _id: Types.ObjectId; code: string } | null = null;
     let explicitSubjectDoc: { _id: Types.ObjectId; name: string } | null = null;
 
-    if (options?.primaryLevelId && Types.ObjectId.isValid(options.primaryLevelId)) {
-      explicitLevelDoc = await EducationLevelModel.findById(options.primaryLevelId).lean();
+    if (options?.primaryLevelId) {
+      const isOid = Types.ObjectId.isValid(options.primaryLevelId) && options.primaryLevelId.length === 24;
+      explicitLevelDoc = await EducationLevelModel.findOne({
+        $or: [
+          ...(isOid ? [{ _id: new Types.ObjectId(options.primaryLevelId) }] : []),
+          { code: options.primaryLevelId.toUpperCase() },
+        ],
+      }).lean();
     }
-    if (options?.subjectId && Types.ObjectId.isValid(options.subjectId)) {
-      explicitSubjectDoc = await SubjectModel.findById(options.subjectId).lean();
+    if (options?.subjectId) {
+      const isOid = Types.ObjectId.isValid(options.subjectId) && options.subjectId.length === 24;
+      explicitSubjectDoc = await SubjectModel.findOne({
+        $or: [
+          ...(isOid ? [{ _id: new Types.ObjectId(options.subjectId) }] : []),
+          { name: new RegExp(options.subjectId, 'i') },
+        ],
+      }).lean();
     }
+
+    let createdLessons = 0;
 
     for (const file of files) {
       try {
         const asset = await StorageService.uploadPrivatePdf(file);
         const parsed = ImportParserService.parseFileName(file.originalName);
 
-        let levelId: Types.ObjectId | undefined = explicitLevelDoc
-          ? new Types.ObjectId(explicitLevelDoc._id.toString())
-          : undefined;
-        let levelCode: string | undefined = explicitLevelDoc ? explicitLevelDoc.code : parsed.levelCode;
+        let levelId = explicitLevelDoc?._id;
+        let levelCode = explicitLevelDoc?.code || parsed.levelCode;
 
         if (!levelId && parsed.levelCode) {
           const levelDoc = await EducationLevelModel.findOne({ code: parsed.levelCode }).lean();
           if (levelDoc) {
-            levelId = new Types.ObjectId(levelDoc._id.toString());
+            levelId = levelDoc._id;
             levelCode = levelDoc.code;
           }
         }
 
-        let subjectId: Types.ObjectId | undefined = explicitSubjectDoc
-          ? new Types.ObjectId(explicitSubjectDoc._id.toString())
-          : undefined;
-        let subjectName: string | undefined = explicitSubjectDoc ? explicitSubjectDoc.name : parsed.subjectKeyword;
+        if (!levelId) {
+          const defLevel = await EducationLevelModel.findOne().sort({ order: 1 }).lean();
+          if (defLevel) {
+            levelId = defLevel._id;
+            levelCode = defLevel.code;
+          }
+        }
+
+        let subjectId = explicitSubjectDoc?._id;
+        let subjectName = explicitSubjectDoc?.name || parsed.subjectKeyword;
 
         if (!subjectId && parsed.subjectKeyword && levelId) {
           const subjectDoc = await SubjectModel.findOne({
@@ -62,27 +80,53 @@ export class ImportBatchService {
             levelIds: levelId,
           }).lean();
           if (subjectDoc) {
-            subjectId = new Types.ObjectId(subjectDoc._id.toString());
+            subjectId = subjectDoc._id;
             subjectName = subjectDoc.name;
+          }
+        }
+
+        if (!subjectId && levelId) {
+          const fallbackSub = await SubjectModel.findOne({ levelIds: levelId }).lean();
+          if (fallbackSub) {
+            subjectId = fallbackSub._id;
+            subjectName = fallbackSub.name;
           }
         }
 
         const title =
           parsed.suggestedTitle ||
+          file.originalName.replace(/\.pdf$/i, '').trim() ||
           `${subjectName || 'Fiche'} - ${levelCode || ''}`.trim();
+
+        let lessonId: Types.ObjectId | undefined;
+        if (levelId && subjectId) {
+          const lesson = await LessonModel.create({
+            title,
+            levelId,
+            subjectId,
+            week: parsed.week || 1,
+            topic: parsed.topic || title,
+            fileAssetId: new Types.ObjectId(asset.id),
+            status: 'DRAFT',
+            createdBy: new Types.ObjectId(adminId),
+          });
+          lessonId = new Types.ObjectId(lesson.id);
+          createdLessons++;
+        }
 
         batchItems.push({
           fileName: asset.storageKey,
           originalName: file.originalName,
-          status: 'PARSED',
+          status: lessonId ? 'IMPORTED' : 'PARSED',
           assetId: new Types.ObjectId(asset.id),
+          lessonId,
           parsedData: {
             levelCode: levelCode as any,
             levelId,
             subjectName,
             subjectId,
-            week: parsed.week,
-            topic: parsed.topic,
+            week: parsed.week || 1,
+            topic: parsed.topic || title,
             title,
           },
         });
@@ -98,9 +142,11 @@ export class ImportBatchService {
       }
     }
 
+    const finalStatus = createdLessons > 0 ? 'COMPLETED' : (failed === files.length ? 'FAILED' : 'REVIEW_REQUIRED');
+
     return await ImportBatchModel.create({
       createdBy: new Types.ObjectId(adminId),
-      status: 'REVIEW_REQUIRED',
+      status: finalStatus,
       totalFiles: files.length,
       processedFiles: processed,
       failedFiles: failed,
@@ -108,11 +154,61 @@ export class ImportBatchService {
     });
   }
 
+  private static async createLessonFromItem(
+    item: IBatchItem,
+    adminId: Types.ObjectId | string
+  ): Promise<Types.ObjectId | null> {
+    if (item.status !== 'PARSED' || !item.assetId) return null;
+
+    let levelId = item.parsedData?.levelId;
+    let subjectId = item.parsedData?.subjectId;
+
+    if (!levelId) {
+      const defLevel = await EducationLevelModel.findOne().sort({ order: 1 }).lean();
+      if (defLevel) levelId = defLevel._id;
+    }
+    if (!subjectId && levelId) {
+      const defSub = await SubjectModel.findOne({ levelIds: levelId }).lean();
+      if (defSub) subjectId = defSub._id;
+    }
+
+    if (!levelId || !subjectId) return null;
+
+    const lesson = await LessonModel.create({
+      title: item.parsedData?.title || item.originalName.replace(/\.pdf$/i, ''),
+      levelId,
+      subjectId,
+      domainId: item.parsedData?.domainId,
+      week: item.parsedData?.week || 1,
+      topic: item.parsedData?.topic || item.originalName,
+      fileAssetId: item.assetId,
+      status: 'DRAFT',
+      createdBy: new Types.ObjectId(adminId),
+    });
+
+    item.status = 'IMPORTED';
+    item.lessonId = new Types.ObjectId(lesson.id);
+    return item.lessonId;
+  }
+
   public static async getBatches(): Promise<IImportBatchDocument[]> {
-    return (await ImportBatchModel.find()
-      .sort({ createdAt: -1 })
-      .limit(20)
-      .lean()) as unknown as IImportBatchDocument[];
+    const batches = await ImportBatchModel.find().sort({ createdAt: -1 }).limit(20);
+
+    for (const batch of batches) {
+      if (batch.status === 'REVIEW_REQUIRED') {
+        let changed = false;
+        for (const item of batch.files) {
+          const lessonId = await this.createLessonFromItem(item, batch.createdBy);
+          if (lessonId) changed = true;
+        }
+        if (changed) {
+          batch.status = 'COMPLETED';
+          await batch.save();
+        }
+      }
+    }
+
+    return batches as unknown as IImportBatchDocument[];
   }
 
   public static async getBatchById(batchId: string): Promise<IImportBatchDocument> {
@@ -138,29 +234,9 @@ export class ImportBatchService {
     }
 
     let createdCount = 0;
-
     for (const item of batch.files) {
-      if (item.status === 'PARSED' && item.parsedData && item.assetId) {
-        if (!item.parsedData.levelId || !item.parsedData.subjectId) {
-          continue; // En attente d'assignation manuelle
-        }
-
-        const lesson = await LessonModel.create({
-          title: item.parsedData.title || item.originalName,
-          levelId: item.parsedData.levelId,
-          subjectId: item.parsedData.subjectId,
-          domainId: item.parsedData.domainId,
-          week: item.parsedData.week,
-          topic: item.parsedData.topic,
-          fileAssetId: item.assetId,
-          status: 'DRAFT', // Obligatoirement DRAFT (CDC Section 71)
-          createdBy: new Types.ObjectId(adminId),
-        });
-
-        item.status = 'IMPORTED';
-        item.lessonId = new Types.ObjectId(lesson.id);
-        createdCount++;
-      }
+      const lessonId = await this.createLessonFromItem(item, adminId);
+      if (lessonId) createdCount++;
     }
 
     batch.status = 'COMPLETED';
