@@ -36,7 +36,27 @@ export class PaymentService {
       plan = await SubscriptionPlanModel.findById(input.planId);
     }
     if (!plan) {
-      plan = await SubscriptionPlanModel.findOne({ code: 'ESSENTIEL', active: true });
+      plan = await SubscriptionPlanModel.findOne({ code: 'ESSENTIEL' });
+    }
+    if (!plan) {
+      plan = await SubscriptionPlanModel.findOne({ active: true });
+    }
+    if (!plan) {
+      plan = await SubscriptionPlanModel.create({
+        code: 'ESSENTIEL',
+        name: 'Forfait Essentiel Enseignant',
+        description: 'Accès complet aux fiches pédagogiques de votre niveau de classe',
+        price: 200,
+        currency: 'XOF',
+        intervalMonths: 1,
+        features: [
+          'Fiches pédagogiques de votre classe',
+          'Consultation en ligne illimitée',
+          'Gestion des favoris',
+          'Mode hors connexion contrôlé',
+        ],
+        active: true,
+      });
     }
 
     const amount = plan ? plan.price : 200;

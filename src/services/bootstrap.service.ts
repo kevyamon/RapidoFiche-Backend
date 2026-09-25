@@ -116,22 +116,22 @@ export class BootstrapService {
 
       // 5. Offre Commerciale MVP (200 FCFA / 30 jours)
       await SubscriptionPlanModel.findOneAndUpdate(
-        { code: 'PLAN_ESSENTIEL_200' },
+        { code: 'ESSENTIEL' },
         {
-          code: 'PLAN_ESSENTIEL_200',
+          code: 'ESSENTIEL',
           name: 'Forfait Essentiel Enseignant',
           description: 'Accès illimité aux fiches pédagogiques du niveau de classe enseigné.',
-          priceXOF: 200,
-          durationDays: 30,
+          price: 200,
+          currency: 'XOF',
+          intervalMonths: 1,
           features: [
             'Accès illimité à toutes les fiches de votre niveau',
             'Visionneuse sécurisée intégrée',
             'Sauvegarde hors-ligne sur votre appareil',
           ],
           active: true,
-          isDefault: true,
         },
-        { upsert: true }
+        { upsert: true, new: true }
       );
 
       // 6. Super Administrateur par défaut

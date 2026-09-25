@@ -70,9 +70,26 @@ export class SubscriptionService {
     paymentId: string,
     _amountPaid: number
   ): Promise<ISubscriptionDocument> {
-    const plan = await SubscriptionPlanModel.findOne({ code: 'ESSENTIEL', active: true });
+    let plan = await SubscriptionPlanModel.findOne({ code: 'ESSENTIEL' });
     if (!plan) {
-      throw new AppError(ERROR_CODES.RESOURCE_NOT_FOUND, 'Plan d’abonnement introuvable', 404);
+      plan = await SubscriptionPlanModel.findOne({ active: true });
+    }
+    if (!plan) {
+      plan = await SubscriptionPlanModel.create({
+        code: 'ESSENTIEL',
+        name: 'Forfait Essentiel Enseignant',
+        description: 'Accès complet aux fiches pédagogiques de votre niveau de classe',
+        price: 200,
+        currency: 'XOF',
+        intervalMonths: 1,
+        features: [
+          'Fiches pédagogiques de votre classe',
+          'Consultation en ligne illimitée',
+          'Gestion des favoris',
+          'Mode hors connexion contrôlé',
+        ],
+        active: true,
+      });
     }
 
     const now = new Date();
