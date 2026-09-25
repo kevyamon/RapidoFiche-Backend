@@ -130,8 +130,8 @@ export const errorHandler: ErrorRequestHandler = (
     success: false,
     error: {
       code: ERROR_CODES.INTERNAL_ERROR,
-      message: 'Une erreur technique interne est survenue sur le serveur',
-      details: [],
+      message: unexpectedError.message || 'Une erreur technique interne est survenue sur le serveur',
+      details: [{ field: 'system', message: unexpectedError.message }],
     },
   });
 };
