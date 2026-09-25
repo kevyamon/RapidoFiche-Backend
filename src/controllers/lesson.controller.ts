@@ -1,9 +1,9 @@
 import fs from 'fs';
 import { Request, Response, NextFunction } from 'express';
 import { LessonService } from '../services/lesson.service';
+import { ContentAccessService } from '../services/content-access.service';
 import { StorageService } from '../integrations/storage/storage.service';
 import { AssetModel } from '../models/asset.model';
-import { LessonModel } from '../models/lesson.model';
 import { verifyLessonAccessToken } from '../utils/token.utils';
 import { QueryLessonsInput } from '../schemas/lesson.schema';
 import { ApiSuccessResponse, ApiPaginatedResponse } from '../contracts/api.types';
@@ -87,10 +87,12 @@ export class LessonController {
         throw new AppError(ERROR_CODES.LEVEL_ACCESS_DENIED, 'Jeton non valide pour cette fiche', 403);
       }
 
-      const lesson = await LessonModel.findById(req.params.id);
-      if (!lesson) {
-        throw new AppError(ERROR_CODES.LESSON_NOT_FOUND, 'Fiche introuvable', 404);
-      }
+      // Vérification temps réel en base de données de l'abonnement actif (Forteresse)
+      const { lesson } = await ContentAccessService.assertCanAccessLesson(
+        payload.userId,
+        payload.role || 'TEACHER',
+        req.params.id
+      );
 
       const asset = await AssetModel.findById(lesson.fileAssetId);
       if (!asset) {
@@ -99,9 +101,13 @@ export class LessonController {
 
       const localPath = await StorageService.getLocalFilePath(asset.storageKey);
 
+      // En-têtes stricts anti-téléchargement et anti-mise en cache
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(asset.originalName)}"`);
-      res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+      res.setHeader('Content-Disposition', 'inline; filename="apercu-securise.pdf"');
+      res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
 
       const stream = fs.createReadStream(localPath);
       stream.pipe(res);

@@ -19,6 +19,7 @@ export interface LessonAccessTokenPayload {
   userId: string;
   lessonId: string;
   levelId: string;
+  role?: UserRole;
 }
 
 export function generateAccessToken(payload: AccessTokenPayload): string {

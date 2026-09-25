@@ -14,6 +14,7 @@ export interface CreatePaymentSessionParams {
   customerEmail: string;
   customerPhone?: string;
   paymentMethod?: string;
+  returnUrl?: string;
 }
 
 export interface PaymentSessionResponse {
@@ -22,71 +23,91 @@ export interface PaymentSessionResponse {
 }
 
 export class GeniusPayService {
-  private static readonly baseUrl = env.GENIUSPAY_BASE_URL;
-
   public static async createPaymentSession(
     params: CreatePaymentSessionParams
   ): Promise<PaymentSessionResponse> {
-    // Mode Mock de développement si pas de clés configurées
-    if (env.PAYMENT_PROVIDER === 'mock' || !env.GENIUSPAY_API_KEY) {
-      logger.info(
-        'PAYMENT',
-        `Mode Mock activé pour GeniusPay. Réf: ${params.reference}, Montant: ${params.amount} ${params.currency}`
-      );
-      return {
-        checkoutUrl: `${env.FRONTEND_URL}/mock-payment?ref=${params.reference}&amount=${params.amount}`,
-        providerTransactionId: `gp_mock_tx_${Date.now()}`,
-      };
-    }
+    const cleanBaseUrl = (env.GENIUSPAY_BASE_URL || 'https://pay.genius.ci/api/v1/merchant').replace(/\/+$/, '');
+    const endpoint = cleanBaseUrl.endsWith('/payments') ? cleanBaseUrl : `${cleanBaseUrl}/payments`;
+    const finalReturnUrl = params.returnUrl || `${env.FRONTEND_URL}/fiches?payment=success&ref=${params.reference}`;
 
     try {
-      const response = await axios.post(
-        `${this.baseUrl}/payments`,
-        {
-          amount: params.amount,
-          currency: params.currency,
-          reference: params.reference,
-          description: params.description,
-          customer: {
-            name: params.customerName,
-            email: params.customerEmail,
-            phone: params.customerPhone,
-          },
-          payment_method:
-            params.paymentMethod && params.paymentMethod !== 'ALL'
-              ? params.paymentMethod.toLowerCase()
-              : undefined,
-          return_url: `${env.FRONTEND_URL}/dashboard?payment=success&ref=${params.reference}`,
-          cancel_url: `${env.FRONTEND_URL}/dashboard?payment=cancelled`,
+      const payload: Record<string, unknown> = {
+        amount: Math.round(params.amount),
+        currency: params.currency || 'XOF',
+        reference: params.reference,
+        description: params.description || 'Abonnement RapidoFiche 30 jours',
+        customer: {
+          name: params.customerName,
+          email: params.customerEmail,
+          phone: params.customerPhone || undefined,
         },
-        {
-          headers: {
-            'X-API-Key': env.GENIUSPAY_API_KEY,
-            'X-API-Secret': env.GENIUSPAY_API_SECRET,
-            'Content-Type': 'application/json',
-          },
-          timeout: 10000,
-        }
-      );
+        return_url: finalReturnUrl,
+        cancel_url: `${env.FRONTEND_URL}/fiches?payment=cancelled`,
+        success_url: finalReturnUrl,
+        error_url: `${env.FRONTEND_URL}/fiches?payment=cancelled`,
+      };
+
+      const response = await axios.post(endpoint, payload, {
+        headers: {
+          'X-API-Key': env.GENIUSPAY_API_KEY.trim(),
+          'X-API-Secret': env.GENIUSPAY_API_SECRET.trim(),
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        timeout: 15000,
+      });
+
+      const responseData = response.data;
+      const checkoutUrl =
+        responseData?.data?.checkout_url ||
+        responseData?.checkout_url ||
+        responseData?.data?.payment_url ||
+        responseData?.payment_url ||
+        responseData?.data?.url ||
+        responseData?.url;
+
+      const providerTransactionId =
+        responseData?.data?.id ||
+        responseData?.data?.payment?.id ||
+        responseData?.id ||
+        params.reference;
+
+      if (!checkoutUrl) {
+        logger.error('PAYMENT', 'URL de paiement introuvable dans la réponse GeniusPay', {
+          response: responseData,
+        });
+        throw new AppError(
+          ERROR_CODES.PAYMENT_FAILED,
+          'La passerelle de paiement n’a pas renvoyé d’URL de paiement valide',
+          502
+        );
+      }
+
+      logger.info('PAYMENT', `Session GeniusPay créée avec succès : ${checkoutUrl}`);
 
       return {
-        checkoutUrl:
-          response.data?.checkout_url ||
-          response.data?.payment_url ||
-          response.data?.data?.checkout_url,
-        providerTransactionId:
-          response.data?.id ||
-          response.data?.data?.id ||
-          params.reference,
+        checkoutUrl,
+        providerTransactionId,
       };
-    } catch (error) {
+    } catch (error: any) {
+      const status = error.response?.status;
+      const data = error.response?.data;
       logger.error('PAYMENT', 'Échec d’appel à l’API GeniusPay', {
-        error: error instanceof Error ? error.message : String(error),
+        status,
+        data,
+        message: error.message,
+        endpoint,
       });
+
+      const userMsg =
+        data?.message ||
+        data?.error ||
+        'Impossible de contacter la passerelle de paiement. Veuillez vérifier votre connexion';
+
       throw new AppError(
         ERROR_CODES.PAYMENT_FAILED,
-        'Impossible de contacter la passerelle de paiement. Veuillez réessayer',
-        502
+        userMsg,
+        status && status >= 400 && status < 500 ? status : 502
       );
     }
   }

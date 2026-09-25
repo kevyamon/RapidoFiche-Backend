@@ -146,6 +146,7 @@ export class LessonService {
       userId,
       lessonId: lesson.id,
       levelId: lesson.levelId.toString(),
+      role: userRole,
     });
 
     // Enregistrement automatique dans l'historique sans bloquer la réponse

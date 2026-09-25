@@ -48,6 +48,11 @@ export class SubscriptionService {
     const end = subscription.endDate ? new Date(subscription.endDate).getTime() : now;
     const diffDays = Math.max(0, Math.ceil((end - now) / (1000 * 60 * 60 * 24)));
 
+    if (!isActive && subscription.status === 'ACTIVE') {
+      subscription.status = 'EXPIRED';
+      await subscription.save();
+    }
+
     return {
       hasSubscription: true,
       isActive,

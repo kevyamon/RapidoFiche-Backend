@@ -7,6 +7,7 @@ import { GeniusPayService } from '../integrations/payment/geniuspay.service';
 import { SubscriptionService } from './subscription.service';
 import { NotificationService } from './notification.service';
 import { InitiatePaymentInput, GeniusPayWebhookInput } from '../schemas/subscription-payment.schema';
+import { env } from '../config/env.config';
 import { AppError } from '../utils/app-error.utils';
 import { ERROR_CODES } from '../constants/errors.constants';
 import { logger } from '../utils/logger.utils';
@@ -58,7 +59,39 @@ export class PaymentService {
       await user.save();
     }
 
-    // 2. Appel à l'orchestrateur GeniusPay
+    // 2. Gestion du mode Mock vs Mode Réel/Sandbox GeniusPay
+    const isMock = env.PAYMENT_PROVIDER === 'mock' || !env.GENIUSPAY_API_KEY;
+
+    if (isMock) {
+      payment.status = 'SUCCESS';
+      payment.providerTransactionId = `gp_mock_tx_${Date.now()}`;
+      await payment.save();
+
+      const subscription = await SubscriptionService.activateSubscription(
+        userId,
+        payment.id,
+        amount
+      );
+
+      payment.subscriptionId = new Types.ObjectId(subscription.id);
+      await payment.save();
+
+      NotificationService.notifyPaymentSuccess(userId, amount, reference).catch(() => {});
+
+      logger.info('PAYMENT', `Mode Mock : Abonnement activé instantanément pour ${userId}`);
+
+      const targetUrl = input.callbackUrl || `${env.FRONTEND_URL}/fiches?payment=success&mock=true&ref=${reference}`;
+
+      return {
+        paymentId: payment.id,
+        reference: payment.reference,
+        checkoutUrl: targetUrl,
+        amount,
+        currency: 'XOF',
+      };
+    }
+
+    // 3. Appel à l'orchestrateur GeniusPay
     const session = await GeniusPayService.createPaymentSession({
       amount,
       currency: 'XOF',
@@ -67,10 +100,10 @@ export class PaymentService {
       customerName: `${user.firstName} ${user.lastName}`,
       customerEmail: user.email,
       customerPhone: finalPhone,
-      paymentMethod: input.paymentMethod,
+      returnUrl: input.callbackUrl,
     });
 
-    // 3. Mise à jour de la transaction avec l'identifiant distant
+    // 4. Mise à jour de la transaction avec l'identifiant distant
     payment.providerTransactionId = session.providerTransactionId;
     payment.status = 'PENDING';
     await payment.save();
