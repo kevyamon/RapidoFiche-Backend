@@ -30,7 +30,7 @@ export class PaymentService {
       throw AppError.unauthorized('Compte utilisateur non autorisé');
     }
 
-    // Récupération du plan MVP Essentiel (200 FCFA)
+    // Récupération ou mise à jour sécurisée du plan MVP Essentiel (200 FCFA)
     let plan = null;
     if (input.planId) {
       plan = await SubscriptionPlanModel.findById(input.planId);
@@ -57,9 +57,12 @@ export class PaymentService {
         ],
         active: true,
       });
+    } else if (!plan.price || typeof plan.price !== 'number' || plan.price < 200) {
+      plan.price = 200;
+      await plan.save();
     }
 
-    const amount = plan ? plan.price : 200;
+    const amount = plan && typeof plan.price === 'number' && plan.price >= 200 ? plan.price : 200;
     const reference = `RF_${Date.now()}_${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
     // 1. Détermination du mode Mock vs Mode Réel/Sandbox GeniusPay
@@ -76,7 +79,7 @@ export class PaymentService {
     const payment = await PaymentModel.create({
       userId: new Types.ObjectId(userId),
       reference,
-      amount,
+      amount: amount || 200,
       currency: 'XOF',
       provider: isMock ? 'mock' : 'geniuspay',
       status: 'CREATED',

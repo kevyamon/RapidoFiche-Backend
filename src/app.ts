@@ -45,7 +45,7 @@ export function createApp(): Express {
 
   // 5. Point de contrôle santé (CDC Section 133)
   app.get('/health', (_req: Request, res: Response) => {
-    res.status(200).json({ status: 'ok', version: '2026.09.25.v4' });
+    res.status(200).json({ status: 'ok', version: '2026.09.25.v5' });
   });
 
   // 6. Montage du routeur API versionné

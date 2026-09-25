@@ -90,6 +90,9 @@ export class SubscriptionService {
         ],
         active: true,
       });
+    } else if (!plan.price || typeof plan.price !== 'number' || plan.price < 200) {
+      plan.price = 200;
+      await plan.save();
     }
 
     const now = new Date();
