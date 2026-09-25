@@ -62,8 +62,13 @@ export class PedagogyController {
     next: NextFunction
   ): Promise<void> {
     try {
-      if (!req.user || !req.user.primaryLevelId) {
-        throw AppError.unauthorized('Aucun niveau scolaire associé à votre profil enseignant');
+      if (!req.user) {
+        throw AppError.unauthorized();
+      }
+
+      if (!req.user.primaryLevelId) {
+        res.status(200).json({ success: true, data: [] });
+        return;
       }
 
       const subjects = await PedagogyService.getTeacherSubjects(req.user.primaryLevelId);

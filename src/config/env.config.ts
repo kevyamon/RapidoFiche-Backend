@@ -17,11 +17,18 @@ const envSchema = z.object({
   JWT_SECRET: z
     .string()
     .min(16, 'JWT_SECRET doit contenir au moins 16 caractères')
-    .default('cle_secrete_par_defaut_pour_le_dev_rapidofiche_2026'),
+    .default(
+      process.env.JWT_ACCESS_SECRET ||
+      process.env.JWT_SECRET ||
+      'cle_secrete_par_defaut_pour_le_dev_rapidofiche_2026'
+    ),
   JWT_REFRESH_SECRET: z
     .string()
     .min(16, 'JWT_REFRESH_SECRET doit contenir au moins 16 caractères')
-    .default('cle_refresh_secrete_dev_rapidofiche_2026_securisee'),
+    .default(
+      process.env.JWT_REFRESH_SECRET ||
+      'cle_refresh_secrete_dev_rapidofiche_2026_securisee'
+    ),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
 
