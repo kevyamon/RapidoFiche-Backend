@@ -62,13 +62,19 @@ export class PaymentService {
     const amount = plan ? plan.price : 200;
     const reference = `RF_${Date.now()}_${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
-    // 1. Création de la transaction en base
+    // 1. Détermination du mode Mock vs Mode Réel/Sandbox GeniusPay
+    const isMock =
+      env.PAYMENT_PROVIDER === 'mock' ||
+      !env.GENIUSPAY_API_KEY ||
+      !env.GENIUSPAY_API_KEY.trim();
+
+    // 2. Création de la transaction en base
     const payment = await PaymentModel.create({
       userId: new Types.ObjectId(userId),
       reference,
       amount,
       currency: 'XOF',
-      provider: 'geniuspay',
+      provider: isMock ? 'mock' : 'geniuspay',
       status: 'CREATED',
       paymentMethod: input.paymentMethod,
     });
@@ -78,9 +84,6 @@ export class PaymentService {
       user.phone = finalPhone;
       await user.save();
     }
-
-    // 2. Gestion du mode Mock vs Mode Réel/Sandbox GeniusPay
-    const isMock = env.PAYMENT_PROVIDER === 'mock' || !env.GENIUSPAY_API_KEY;
 
     if (isMock) {
       payment.status = 'SUCCESS';

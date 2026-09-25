@@ -14,6 +14,7 @@ export class AppError extends Error {
     details?: ApiErrorDetail[]
   ) {
     super(message);
+    Object.setPrototypeOf(this, AppError.prototype);
     this.name = 'AppError';
     this.code = code;
     this.statusCode = statusCode ?? ERROR_HTTP_STATUS[code] ?? 500;

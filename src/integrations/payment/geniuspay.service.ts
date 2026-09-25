@@ -26,9 +26,16 @@ export class GeniusPayService {
   public static async createPaymentSession(
     params: CreatePaymentSessionParams
   ): Promise<PaymentSessionResponse> {
-    const cleanBaseUrl = (env.GENIUSPAY_BASE_URL || 'https://pay.genius.ci/api/v1/merchant').replace(/\/+$/, '');
-    const endpoint = cleanBaseUrl.endsWith('/payments') ? cleanBaseUrl : `${cleanBaseUrl}/payments`;
+    let rawUrl = (env.GENIUSPAY_BASE_URL || 'https://pay.genius.ci/api/v1/merchant').trim().replace(/\/+$/, '');
+    if (!rawUrl.includes('/api/v1/merchant')) {
+      rawUrl = rawUrl.replace(/\/api\/v1$/, '');
+      rawUrl = `${rawUrl}/api/v1/merchant`;
+    }
+    const endpoint = rawUrl.endsWith('/payments') ? rawUrl : `${rawUrl}/payments`;
     const finalReturnUrl = params.returnUrl || `${env.FRONTEND_URL}/fiches?payment=success&ref=${params.reference}`;
+
+    const apiKey = (env.GENIUSPAY_API_KEY || '').trim();
+    const apiSecret = (env.GENIUSPAY_API_SECRET || '').trim();
 
     try {
       const payload: Record<string, unknown> = {
@@ -37,8 +44,8 @@ export class GeniusPayService {
         reference: params.reference,
         description: params.description || 'Abonnement RapidoFiche 30 jours',
         customer: {
-          name: params.customerName,
-          email: params.customerEmail,
+          name: params.customerName || 'Enseignant RapidoFiche',
+          email: params.customerEmail || 'enseignant@rapidofiche.ci',
           phone: params.customerPhone || undefined,
         },
         return_url: finalReturnUrl,
@@ -49,8 +56,8 @@ export class GeniusPayService {
 
       const response = await axios.post(endpoint, payload, {
         headers: {
-          'X-API-Key': env.GENIUSPAY_API_KEY.trim(),
-          'X-API-Secret': env.GENIUSPAY_API_SECRET.trim(),
+          'X-API-Key': apiKey,
+          'X-API-Secret': apiSecret,
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
@@ -64,7 +71,9 @@ export class GeniusPayService {
         responseData?.data?.payment_url ||
         responseData?.payment_url ||
         responseData?.data?.url ||
-        responseData?.url;
+        responseData?.url ||
+        responseData?.data?.link ||
+        responseData?.link;
 
       const providerTransactionId =
         responseData?.data?.id ||
@@ -102,7 +111,11 @@ export class GeniusPayService {
       const userMsg =
         data?.message ||
         data?.error ||
-        'Impossible de contacter la passerelle de paiement. Veuillez vérifier votre connexion';
+        (status === 401 || status === 403
+          ? 'Clés API GeniusPay non autorisées ou expirées. Vérifiez vos identifiants Sandbox/Live'
+          : status === 404
+          ? 'Endpoint GeniusPay introuvable. Vérifiez l’URL de base GeniusPay'
+          : 'Impossible de contacter la passerelle GeniusPay. Veuillez réessayer ultérieurement');
 
       throw new AppError(
         ERROR_CODES.PAYMENT_FAILED,

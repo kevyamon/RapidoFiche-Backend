@@ -14,20 +14,31 @@ export const errorHandler: ErrorRequestHandler = (
   _next: NextFunction
 ): void => {
   // 1. Erreur applicative opérationnelle (AppError)
-  if (err instanceof AppError) {
-    if (err.statusCode >= 500) {
-      logger.error('SYSTEM', `Erreur 500 sur ${req.method} ${req.path}`, {
-        code: err.code,
-        message: err.message,
+  const isAppErr =
+    err instanceof AppError ||
+    (typeof err === 'object' &&
+      err !== null &&
+      (('isOperational' in err && (err as { isOperational: boolean }).isOperational === true) ||
+        (err as { name?: string }).name === 'AppError'));
+
+  if (isAppErr) {
+    const appErr = err as AppError;
+    const statusCode = appErr.statusCode || 500;
+    const errorCode = appErr.code || ERROR_CODES.INTERNAL_ERROR;
+
+    if (statusCode >= 500) {
+      logger.error('SYSTEM', `Erreur ${statusCode} sur ${req.method} ${req.path}`, {
+        code: errorCode,
+        message: appErr.message,
       });
     }
 
-    res.status(err.statusCode).json({
+    res.status(statusCode).json({
       success: false,
       error: {
-        code: err.code,
-        message: err.message,
-        details: err.details ?? [],
+        code: errorCode,
+        message: appErr.message,
+        details: appErr.details ?? [],
       },
     });
     return;
