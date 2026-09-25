@@ -44,7 +44,13 @@ const envSchema = z.object({
   CLOUDINARY_API_SECRET: z.string().optional().default(''),
 
   // Passerelle de Paiement (GeniusPay / Mock)
-  PAYMENT_PROVIDER: z.enum(['geniuspay', 'mock']).default('mock'),
+  PAYMENT_PROVIDER: z
+    .enum(['geniuspay', 'mock'])
+    .default(
+      process.env.GENIUSPAY_API_KEY && process.env.GENIUSPAY_API_KEY.trim() !== ''
+        ? 'geniuspay'
+        : 'mock'
+    ),
   GENIUSPAY_API_KEY: z.string().optional().default(''),
   GENIUSPAY_API_SECRET: z.string().optional().default(''),
   GENIUSPAY_WEBHOOK_SECRET: z.string().optional().default(''),

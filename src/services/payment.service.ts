@@ -63,10 +63,14 @@ export class PaymentService {
     const reference = `RF_${Date.now()}_${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
     // 1. Détermination du mode Mock vs Mode Réel/Sandbox GeniusPay
-    const isMock =
-      env.PAYMENT_PROVIDER === 'mock' ||
-      !env.GENIUSPAY_API_KEY ||
-      !env.GENIUSPAY_API_KEY.trim();
+    const hasGeniusPay = Boolean(
+      env.GENIUSPAY_API_KEY &&
+      env.GENIUSPAY_API_KEY.trim().length > 0 &&
+      env.GENIUSPAY_API_SECRET &&
+      env.GENIUSPAY_API_SECRET.trim().length > 0
+    );
+
+    const isMock = env.PAYMENT_PROVIDER === 'mock' && !hasGeniusPay;
 
     // 2. Création de la transaction en base
     const payment = await PaymentModel.create({
@@ -76,7 +80,7 @@ export class PaymentService {
       currency: 'XOF',
       provider: isMock ? 'mock' : 'geniuspay',
       status: 'CREATED',
-      paymentMethod: input.paymentMethod,
+      paymentMethod: input.paymentMethod || 'ALL',
     });
 
     const finalPhone = input.phoneNumber || input.customerPhone || user.phone;
@@ -115,12 +119,15 @@ export class PaymentService {
     }
 
     // 3. Appel à l'orchestrateur GeniusPay
+    const customerName =
+      `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Enseignant RapidoFiche';
+
     const session = await GeniusPayService.createPaymentSession({
       amount,
       currency: 'XOF',
       reference,
       description: 'Abonnement mensuel RapidoFiche - 200 FCFA',
-      customerName: `${user.firstName} ${user.lastName}`,
+      customerName,
       customerEmail: user.email,
       customerPhone: finalPhone,
       returnUrl: input.callbackUrl,
