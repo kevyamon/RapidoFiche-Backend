@@ -2,10 +2,13 @@ import crypto from 'crypto';
 import { Types } from 'mongoose';
 import { PaymentModel, IPaymentDocument } from '../models/payment.model';
 import { UserModel } from '../models/user.model';
+import { SubscriptionModel } from '../models/subscription.model';
 import { SubscriptionPlanModel } from '../models/subscription-plan.model';
 import { GeniusPayService } from '../integrations/payment/geniuspay.service';
 import { SubscriptionService } from './subscription.service';
 import { NotificationService } from './notification.service';
+import { PaymentVerifyService, VerifyPaymentResult } from './payment.verify.service';
+import { PaymentWebhookService } from './payment.webhook.service';
 import { InitiatePaymentInput } from '../schemas/subscription-payment.schema';
 import { env } from '../config/env.config';
 import { AppError } from '../utils/app-error.utils';
@@ -30,6 +33,21 @@ export class PaymentService {
       throw AppError.unauthorized('Compte utilisateur non autorisé');
     }
 
+    // Protection Forteresse : Ne pas autoriser un nouveau paiement si un abonnement est déjà actif
+    const activeSub = await SubscriptionModel.findOne({
+      userId: new Types.ObjectId(userId),
+      status: 'ACTIVE',
+      endDate: { $gt: new Date() },
+    });
+
+    if (activeSub && activeSub.isCurrentlyActive()) {
+      throw new AppError(
+        ERROR_CODES.CONFLICT,
+        'Vous disposez déjà d’un forfait actif. Le paiement n’est pas nécessaire.',
+        409
+      );
+    }
+
     let plan = await SubscriptionPlanModel.findOne({ code: 'ESSENTIEL' });
     if (!plan) {
       plan = await SubscriptionPlanModel.findOne({ active: true });
@@ -51,6 +69,17 @@ export class PaymentService {
         active: true,
       });
     }
+
+    // Annuler les anciennes transactions en attente pour éviter les cumuls
+    await PaymentModel.updateMany(
+      {
+        userId: new Types.ObjectId(userId),
+        status: { $in: ['CREATED', 'PENDING'] },
+      },
+      {
+        $set: { status: 'CANCELLED' },
+      }
+    );
 
     const amount = 200;
     const reference = `RF_${Date.now()}_${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
@@ -95,9 +124,11 @@ export class PaymentService {
       await payment.save();
 
       NotificationService.notifyPaymentSuccess(userId, amount, reference).catch(() => {});
-      logger.info('PAYMENT', `Mode Mock : Abonnement activé instantanément pour ${userId}`);
+      logger.info('PAYMENT', `Mode Mock : Abonnement activé pour ${userId}`);
 
-      const targetUrl = input.callbackUrl || `${env.FRONTEND_URL}/fiches?payment=success&mock=true&ref=${reference}`;
+      const targetUrl =
+        input.callbackUrl ||
+        `${env.FRONTEND_URL}/fiches?payment=success&mock=true&ref=${reference}`;
 
       return {
         paymentId: payment.id,
@@ -144,176 +175,15 @@ export class PaymentService {
   public static async verifyPaymentStatus(
     userId: string,
     queryReference?: string
-  ): Promise<{ verified: boolean; status: string; payment?: IPaymentDocument; message?: string }> {
-    const cleanRef = queryReference?.trim();
-    let payment: IPaymentDocument | null = null;
-
-    if (cleanRef) {
-      const isObjectId = Types.ObjectId.isValid(cleanRef);
-      payment = await PaymentModel.findOne({
-        userId: new Types.ObjectId(userId),
-        $or: [
-          { reference: cleanRef },
-          { providerTransactionId: cleanRef },
-          ...(isObjectId ? [{ _id: new Types.ObjectId(cleanRef) }] : []),
-        ],
-      });
-    }
-
-    if (!payment) {
-      payment = await PaymentModel.findOne({
-        userId: new Types.ObjectId(userId),
-        status: { $in: ['PENDING', 'CREATED'] },
-      }).sort({ createdAt: -1 });
-    }
-
-    if (!payment) {
-      const latestSuccess = await PaymentModel.findOne({
-        userId: new Types.ObjectId(userId),
-        status: 'SUCCESS',
-      }).sort({ createdAt: -1 });
-
-      if (latestSuccess) {
-        return { verified: true, status: 'SUCCESS', payment: latestSuccess };
-      }
-
-      return { verified: false, status: 'NOT_FOUND', message: 'Aucun paiement en attente trouvé.' };
-    }
-
-    if (payment.status === 'SUCCESS') {
-      return { verified: true, status: 'SUCCESS', payment };
-    }
-
-    const refToCheck = payment.providerTransactionId || payment.reference || cleanRef;
-    if (refToCheck) {
-      const gpDetails = await GeniusPayService.getPaymentStatus(refToCheck);
-
-      if (gpDetails) {
-        payment.rawCallbackPayload = gpDetails.metadata || (gpDetails as unknown as Record<string, unknown>);
-        if (gpDetails.id) payment.providerTransactionId = gpDetails.reference || String(gpDetails.id);
-
-        const isSuccess =
-          gpDetails.status === 'completed' ||
-          gpDetails.status === 'success' ||
-          gpDetails.status === 'paid';
-
-        if (isSuccess) {
-          payment.status = 'SUCCESS';
-          await payment.save();
-
-          const subscription = await SubscriptionService.activateSubscription(
-            payment.userId.toString(),
-            payment.id,
-            payment.amount
-          );
-
-          payment.subscriptionId = new Types.ObjectId(subscription.id);
-          await payment.save();
-
-          NotificationService.notifyPaymentSuccess(
-            payment.userId.toString(),
-            payment.amount,
-            payment.reference
-          ).catch(() => {});
-
-          logger.info('PAYMENT', `Paiement vérifié avec succès via API GeniusPay : ${payment.reference}`);
-          return { verified: true, status: 'SUCCESS', payment };
-        }
-
-        if (gpDetails.status === 'failed' || gpDetails.status === 'cancelled') {
-          payment.status = 'FAILED';
-          await payment.save();
-          return { verified: false, status: 'FAILED', payment, message: 'Paiement échoué ou annulé.' };
-        }
-      }
-    }
-
-    return {
-      verified: false,
-      status: payment.status,
-      payment,
-      message: 'Le paiement est toujours en attente de validation.',
-    };
+  ): Promise<VerifyPaymentResult> {
+    return PaymentVerifyService.verifyPaymentStatus(userId, queryReference);
   }
 
   public static async processWebhook(
     payload: Record<string, any>,
     rawPayload?: Record<string, unknown>
   ): Promise<{ received: boolean; status: string }> {
-    const data = payload.data || payload;
-    const transaction = data.transaction || data.payment || data;
-
-    const reference =
-      transaction.reference ||
-      transaction.id ||
-      data.reference ||
-      data.id ||
-      payload.reference ||
-      payload.metadata?.internalReference ||
-      payload.metadata?.order_id ||
-      data.metadata?.internalReference ||
-      data.metadata?.order_id;
-
-    if (!reference) {
-      logger.warn('PAYMENT', 'Webhook reçu sans référence identifiable', { payload });
-      return { received: false, status: 'MISSING_REFERENCE' };
-    }
-
-    const payment = await PaymentModel.findOne({
-      $or: [
-        { reference: String(reference) },
-        { providerTransactionId: String(reference) },
-      ],
-    });
-
-    if (!payment) {
-      logger.warn('PAYMENT', `Webhook pour transaction introuvable : ${reference}`);
-      throw new AppError(ERROR_CODES.PAYMENT_NOT_FOUND, 'Transaction introuvable', 404);
-    }
-
-    if (payment.status === 'SUCCESS') {
-      return { received: true, status: 'ALREADY_PROCESSED' };
-    }
-
-    payment.rawCallbackPayload = rawPayload || payload;
-    payment.providerTransactionId = String(transaction.id || transaction.reference || reference);
-
-    const eventName = (payload.event || '').toLowerCase();
-    const txnStatus = (transaction.status || data.status || '').toLowerCase();
-
-    const isSuccess =
-      eventName === 'payment.success' ||
-      eventName === 'payment.completed' ||
-      txnStatus === 'completed' ||
-      txnStatus === 'success' ||
-      txnStatus === 'paid';
-
-    if (isSuccess) {
-      payment.status = 'SUCCESS';
-      await payment.save();
-
-      const subscription = await SubscriptionService.activateSubscription(
-        payment.userId.toString(),
-        payment.id,
-        payment.amount
-      );
-
-      payment.subscriptionId = new Types.ObjectId(subscription.id);
-      await payment.save();
-
-      NotificationService.notifyPaymentSuccess(
-        payment.userId.toString(),
-        payment.amount,
-        payment.reference
-      ).catch(() => {});
-
-      logger.info('PAYMENT', `Webhook validé : abonnement activé pour ${payment.reference}`);
-      return { received: true, status: 'SUCCESS' };
-    }
-
-    payment.status = 'FAILED';
-    await payment.save();
-    return { received: true, status: 'FAILED' };
+    return PaymentWebhookService.processWebhook(payload, rawPayload);
   }
 
   public static async getTeacherPayments(userId: string): Promise<IPaymentDocument[]> {

@@ -100,10 +100,21 @@ export class SubscriptionService {
       userId: new Types.ObjectId(userId),
     }).sort({ createdAt: -1 });
 
+    // Idempotence stricte : Si ce paiement a déjà activé cet abonnement, renvoyer l'existant sans cumuler
+    if (
+      subscription &&
+      subscription.paymentId &&
+      subscription.paymentId.toString() === paymentId.toString() &&
+      subscription.status === 'ACTIVE'
+    ) {
+      logger.info('SUBSCRIPTION', `Abonnement déjà actif pour la transaction ${paymentId} (${userId})`);
+      return subscription;
+    }
+
     let startDate = now;
     let endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-    // Si déjà actif, on prolonge à partir de la date de fin existante
+    // Si déjà actif, renouvellement de 30 jours à compter de la date de fin existante
     if (subscription && subscription.isCurrentlyActive() && subscription.endDate) {
       startDate = subscription.startDate || now;
       endDate = new Date(new Date(subscription.endDate).getTime() + 30 * 24 * 60 * 60 * 1000);
