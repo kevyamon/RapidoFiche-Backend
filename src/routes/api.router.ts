@@ -31,6 +31,7 @@ import {
 } from '../schemas/lesson.schema';
 import {
   initiatePaymentSchema,
+  verifyPaymentSchema,
   geniusPayWebhookSchema,
 } from '../schemas/subscription-payment.schema';
 
@@ -43,7 +44,7 @@ import {
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 }, // Max 25 Mo par fichier PDF
+  limits: { fileSize: 25 * 1024 * 1024 },
 });
 
 const validate =
@@ -153,10 +154,21 @@ apiRouter.post(
   SubscriptionPaymentController.initiatePayment
 );
 apiRouter.post(
+  '/payments/verify',
+  authenticate,
+  validate(verifyPaymentSchema),
+  SubscriptionPaymentController.verifyPayment
+);
+apiRouter.get('/payments/verify/:reference', authenticate, SubscriptionPaymentController.verifyPayment);
+apiRouter.get('/payments/verify', authenticate, SubscriptionPaymentController.verifyPayment);
+
+apiRouter.post(
   '/payments/webhook/:provider',
   validate(geniusPayWebhookSchema),
   SubscriptionPaymentController.handleWebhook
 );
+apiRouter.post('/payments/webhook', validate(geniusPayWebhookSchema), SubscriptionPaymentController.handleWebhook);
+apiRouter.post('/webhooks/geniuspay', validate(geniusPayWebhookSchema), SubscriptionPaymentController.handleWebhook);
 
 // ==================== ADMINISTRATION (ADMIN ONLY) ====================
 const adminAuth = [authenticate, requireRole(ROLES.ADMIN)];

@@ -7,31 +7,50 @@ import { ERROR_CODES } from '../../constants/errors.constants';
 
 export interface CreatePaymentSessionParams {
   amount: number;
-  currency: 'XOF';
+  currency?: 'XOF';
   reference: string;
-  description: string;
-  customerName: string;
-  customerEmail: string;
+  description?: string;
+  customerName?: string;
+  customerEmail?: string;
   customerPhone?: string;
   paymentMethod?: string;
   returnUrl?: string;
+  userId?: string;
 }
 
 export interface PaymentSessionResponse {
   checkoutUrl: string;
   providerTransactionId: string;
+  providerReference?: string;
+}
+
+export interface GeniusPayPaymentDetails {
+  id?: number | string;
+  reference: string;
+  amount: number;
+  status: string;
+  currency?: string;
+  paymentMethod?: string;
+  customer?: { name?: string; phone?: string; email?: string };
+  metadata?: Record<string, unknown>;
+  completedAt?: string;
 }
 
 export class GeniusPayService {
-  public static async createPaymentSession(
-    params: CreatePaymentSessionParams
-  ): Promise<PaymentSessionResponse> {
+  private static getApiBaseUrl(): string {
     let rawUrl = (env.GENIUSPAY_BASE_URL || 'https://pay.genius.ci/api/v1/merchant').trim().replace(/\/+$/, '');
     if (!rawUrl.includes('/api/v1/merchant')) {
       rawUrl = rawUrl.replace(/\/api\/v1$/, '');
       rawUrl = `${rawUrl}/api/v1/merchant`;
     }
-    const endpoint = rawUrl.endsWith('/payments') ? rawUrl : `${rawUrl}/payments`;
+    return rawUrl;
+  }
+
+  public static async createPaymentSession(
+    params: CreatePaymentSessionParams
+  ): Promise<PaymentSessionResponse> {
+    const baseUrl = this.getApiBaseUrl();
+    const endpoint = baseUrl.endsWith('/payments') ? baseUrl : `${baseUrl}/payments`;
     const finalReturnUrl = params.returnUrl || `${env.FRONTEND_URL}/fiches?payment=success&ref=${params.reference}`;
 
     const apiKey = (env.GENIUSPAY_API_KEY || '').trim();
@@ -39,19 +58,21 @@ export class GeniusPayService {
 
     try {
       const payload: Record<string, unknown> = {
-        amount: Math.round(params.amount),
+        amount: Math.max(200, Math.round(params.amount)),
         currency: params.currency || 'XOF',
-        reference: params.reference,
         description: params.description || 'Abonnement RapidoFiche 30 jours',
         customer: {
           name: params.customerName || 'Enseignant RapidoFiche',
           email: params.customerEmail || 'enseignant@rapidofiche.ci',
           phone: params.customerPhone || undefined,
         },
-        return_url: finalReturnUrl,
-        cancel_url: `${env.FRONTEND_URL}/fiches?payment=cancelled`,
         success_url: finalReturnUrl,
-        error_url: `${env.FRONTEND_URL}/fiches?payment=cancelled`,
+        error_url: `${env.FRONTEND_URL}/fiches?payment=cancelled&ref=${params.reference}`,
+        metadata: {
+          internalReference: params.reference,
+          userId: params.userId,
+          order_id: params.reference,
+        },
       };
 
       const response = await axios.post(endpoint, payload, {
@@ -65,21 +86,21 @@ export class GeniusPayService {
       });
 
       const responseData = response.data;
-      const checkoutUrl =
-        responseData?.data?.checkout_url ||
-        responseData?.checkout_url ||
-        responseData?.data?.payment_url ||
-        responseData?.payment_url ||
-        responseData?.data?.url ||
-        responseData?.url ||
-        responseData?.data?.link ||
-        responseData?.link;
+      const dataObj = responseData?.data || responseData;
 
+      const checkoutUrl =
+        dataObj?.checkout_url ||
+        dataObj?.payment_url ||
+        dataObj?.url ||
+        dataObj?.link ||
+        responseData?.checkout_url;
+
+      const providerReference = dataObj?.reference || params.reference;
       const providerTransactionId =
-        responseData?.data?.id ||
-        responseData?.data?.payment?.id ||
-        responseData?.id ||
-        params.reference;
+        dataObj?.reference ||
+        dataObj?.id?.toString() ||
+        dataObj?.payment?.id?.toString() ||
+        providerReference;
 
       if (!checkoutUrl) {
         logger.error('PAYMENT', 'URL de paiement introuvable dans la réponse GeniusPay', {
@@ -92,11 +113,12 @@ export class GeniusPayService {
         );
       }
 
-      logger.info('PAYMENT', `Session GeniusPay créée avec succès : ${checkoutUrl}`);
+      logger.info('PAYMENT', `Session GeniusPay créée : ${providerReference} -> ${checkoutUrl}`);
 
       return {
         checkoutUrl,
         providerTransactionId,
+        providerReference,
       };
     } catch (error: any) {
       const status = error.response?.status;
@@ -125,12 +147,56 @@ export class GeniusPayService {
     }
   }
 
+  public static async getPaymentStatus(
+    reference: string
+  ): Promise<GeniusPayPaymentDetails | null> {
+    if (!reference || !reference.trim()) return null;
+
+    const baseUrl = this.getApiBaseUrl();
+    const cleanRef = encodeURIComponent(reference.trim());
+    const endpoint = baseUrl.endsWith('/payments') ? `${baseUrl}/${cleanRef}` : `${baseUrl}/payments/${cleanRef}`;
+
+    const apiKey = (env.GENIUSPAY_API_KEY || '').trim();
+    const apiSecret = (env.GENIUSPAY_API_SECRET || '').trim();
+
+    try {
+      const response = await axios.get(endpoint, {
+        headers: {
+          'X-API-Key': apiKey,
+          'X-API-Secret': apiSecret,
+          Accept: 'application/json',
+        },
+        timeout: 10000,
+      });
+
+      const responseData = response.data;
+      const data = responseData?.data || responseData;
+
+      if (!data) return null;
+
+      return {
+        id: data.id,
+        reference: data.reference || reference,
+        amount: data.amount,
+        status: (data.status || '').toLowerCase(),
+        currency: data.currency || 'XOF',
+        paymentMethod: data.payment_method,
+        customer: data.customer,
+        metadata: data.metadata,
+        completedAt: data.completed_at,
+      };
+    } catch (error: any) {
+      logger.warn('PAYMENT', `Vérification du paiement GeniusPay impossible pour ${reference}: ${error.message}`);
+      return null;
+    }
+  }
+
   public static verifyWebhookSignature(
     signatureHeader: string | undefined,
-    rawPayload: string
+    rawPayload: string,
+    timestampHeader?: string
   ): boolean {
     if (!env.GENIUSPAY_WEBHOOK_SECRET) {
-      // En dev mock, on accepte le webhook si aucun secret n'est spécifié
       return env.isDevelopment;
     }
 
@@ -138,10 +204,27 @@ export class GeniusPayService {
       return false;
     }
 
+    const secret = env.GENIUSPAY_WEBHOOK_SECRET.trim();
+    const payloadToSign = timestampHeader ? `${timestampHeader}.${rawPayload}` : rawPayload;
+
     const computedSignature = crypto
-      .createHmac('sha256', env.GENIUSPAY_WEBHOOK_SECRET)
-      .update(rawPayload)
+      .createHmac('sha256', secret)
+      .update(payloadToSign)
       .digest('hex');
+
+    if (computedSignature.length !== signatureHeader.length) {
+      const fallbackSignature = crypto
+        .createHmac('sha256', secret)
+        .update(rawPayload)
+        .digest('hex');
+      if (fallbackSignature.length === signatureHeader.length) {
+        return crypto.timingSafeEqual(
+          Buffer.from(signatureHeader),
+          Buffer.from(fallbackSignature)
+        );
+      }
+      return false;
+    }
 
     return crypto.timingSafeEqual(
       Buffer.from(signatureHeader),

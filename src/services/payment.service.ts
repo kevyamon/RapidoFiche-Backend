@@ -6,7 +6,7 @@ import { SubscriptionPlanModel } from '../models/subscription-plan.model';
 import { GeniusPayService } from '../integrations/payment/geniuspay.service';
 import { SubscriptionService } from './subscription.service';
 import { NotificationService } from './notification.service';
-import { InitiatePaymentInput, GeniusPayWebhookInput } from '../schemas/subscription-payment.schema';
+import { InitiatePaymentInput } from '../schemas/subscription-payment.schema';
 import { env } from '../config/env.config';
 import { AppError } from '../utils/app-error.utils';
 import { ERROR_CODES } from '../constants/errors.constants';
@@ -30,14 +30,7 @@ export class PaymentService {
       throw AppError.unauthorized('Compte utilisateur non autorisé');
     }
 
-    // Récupération ou mise à jour sécurisée du plan MVP Essentiel (200 FCFA)
-    let plan = null;
-    if (input.planId) {
-      plan = await SubscriptionPlanModel.findById(input.planId);
-    }
-    if (!plan) {
-      plan = await SubscriptionPlanModel.findOne({ code: 'ESSENTIEL' });
-    }
+    let plan = await SubscriptionPlanModel.findOne({ code: 'ESSENTIEL' });
     if (!plan) {
       plan = await SubscriptionPlanModel.findOne({ active: true });
     }
@@ -57,15 +50,11 @@ export class PaymentService {
         ],
         active: true,
       });
-    } else if (!plan.price || typeof plan.price !== 'number' || plan.price < 200) {
-      plan.price = 200;
-      await plan.save();
     }
 
-    const amount = plan && typeof plan.price === 'number' && plan.price >= 200 ? plan.price : 200;
+    const amount = 200;
     const reference = `RF_${Date.now()}_${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
-    // 1. Détermination du mode Mock vs Mode Réel/Sandbox GeniusPay
     const hasGeniusPay = Boolean(
       env.GENIUSPAY_API_KEY &&
       env.GENIUSPAY_API_KEY.trim().length > 0 &&
@@ -75,11 +64,10 @@ export class PaymentService {
 
     const isMock = env.PAYMENT_PROVIDER === 'mock' && !hasGeniusPay;
 
-    // 2. Création de la transaction en base
     const payment = await PaymentModel.create({
       userId: new Types.ObjectId(userId),
       reference,
-      amount: amount || 200,
+      amount,
       currency: 'XOF',
       provider: isMock ? 'mock' : 'geniuspay',
       status: 'CREATED',
@@ -107,7 +95,6 @@ export class PaymentService {
       await payment.save();
 
       NotificationService.notifyPaymentSuccess(userId, amount, reference).catch(() => {});
-
       logger.info('PAYMENT', `Mode Mock : Abonnement activé instantanément pour ${userId}`);
 
       const targetUrl = input.callbackUrl || `${env.FRONTEND_URL}/fiches?payment=success&mock=true&ref=${reference}`;
@@ -121,7 +108,6 @@ export class PaymentService {
       };
     }
 
-    // 3. Appel à l'orchestrateur GeniusPay
     const customerName =
       `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Enseignant RapidoFiche';
 
@@ -134,9 +120,9 @@ export class PaymentService {
       customerEmail: user.email,
       customerPhone: finalPhone,
       returnUrl: input.callbackUrl,
+      userId,
     });
 
-    // 4. Mise à jour de la transaction avec l'identifiant distant
     payment.providerTransactionId = session.providerTransactionId;
     payment.status = 'PENDING';
     await payment.save();
@@ -155,38 +141,157 @@ export class PaymentService {
     };
   }
 
-  public static async processWebhook(
-    payload: GeniusPayWebhookInput,
-    rawPayload?: Record<string, unknown>
-  ): Promise<{ received: boolean; status: string }> {
-    const { payment: paymentData } = payload.data;
-    const payment = await PaymentModel.findOne({ reference: paymentData.reference });
+  public static async verifyPaymentStatus(
+    userId: string,
+    queryReference?: string
+  ): Promise<{ verified: boolean; status: string; payment?: IPaymentDocument; message?: string }> {
+    const cleanRef = queryReference?.trim();
+    let payment: IPaymentDocument | null = null;
+
+    if (cleanRef) {
+      const isObjectId = Types.ObjectId.isValid(cleanRef);
+      payment = await PaymentModel.findOne({
+        userId: new Types.ObjectId(userId),
+        $or: [
+          { reference: cleanRef },
+          { providerTransactionId: cleanRef },
+          ...(isObjectId ? [{ _id: new Types.ObjectId(cleanRef) }] : []),
+        ],
+      });
+    }
 
     if (!payment) {
-      logger.warn('PAYMENT', `Webhook reçu pour référence inconnue : ${paymentData.reference}`);
+      payment = await PaymentModel.findOne({
+        userId: new Types.ObjectId(userId),
+        status: { $in: ['PENDING', 'CREATED'] },
+      }).sort({ createdAt: -1 });
+    }
+
+    if (!payment) {
+      const latestSuccess = await PaymentModel.findOne({
+        userId: new Types.ObjectId(userId),
+        status: 'SUCCESS',
+      }).sort({ createdAt: -1 });
+
+      if (latestSuccess) {
+        return { verified: true, status: 'SUCCESS', payment: latestSuccess };
+      }
+
+      return { verified: false, status: 'NOT_FOUND', message: 'Aucun paiement en attente trouvé.' };
+    }
+
+    if (payment.status === 'SUCCESS') {
+      return { verified: true, status: 'SUCCESS', payment };
+    }
+
+    const refToCheck = payment.providerTransactionId || payment.reference || cleanRef;
+    if (refToCheck) {
+      const gpDetails = await GeniusPayService.getPaymentStatus(refToCheck);
+
+      if (gpDetails) {
+        payment.rawCallbackPayload = gpDetails.metadata || (gpDetails as unknown as Record<string, unknown>);
+        if (gpDetails.id) payment.providerTransactionId = gpDetails.reference || String(gpDetails.id);
+
+        const isSuccess =
+          gpDetails.status === 'completed' ||
+          gpDetails.status === 'success' ||
+          gpDetails.status === 'paid';
+
+        if (isSuccess) {
+          payment.status = 'SUCCESS';
+          await payment.save();
+
+          const subscription = await SubscriptionService.activateSubscription(
+            payment.userId.toString(),
+            payment.id,
+            payment.amount
+          );
+
+          payment.subscriptionId = new Types.ObjectId(subscription.id);
+          await payment.save();
+
+          NotificationService.notifyPaymentSuccess(
+            payment.userId.toString(),
+            payment.amount,
+            payment.reference
+          ).catch(() => {});
+
+          logger.info('PAYMENT', `Paiement vérifié avec succès via API GeniusPay : ${payment.reference}`);
+          return { verified: true, status: 'SUCCESS', payment };
+        }
+
+        if (gpDetails.status === 'failed' || gpDetails.status === 'cancelled') {
+          payment.status = 'FAILED';
+          await payment.save();
+          return { verified: false, status: 'FAILED', payment, message: 'Paiement échoué ou annulé.' };
+        }
+      }
+    }
+
+    return {
+      verified: false,
+      status: payment.status,
+      payment,
+      message: 'Le paiement est toujours en attente de validation.',
+    };
+  }
+
+  public static async processWebhook(
+    payload: Record<string, any>,
+    rawPayload?: Record<string, unknown>
+  ): Promise<{ received: boolean; status: string }> {
+    const data = payload.data || payload;
+    const transaction = data.transaction || data.payment || data;
+
+    const reference =
+      transaction.reference ||
+      transaction.id ||
+      data.reference ||
+      data.id ||
+      payload.reference ||
+      payload.metadata?.internalReference ||
+      payload.metadata?.order_id ||
+      data.metadata?.internalReference ||
+      data.metadata?.order_id;
+
+    if (!reference) {
+      logger.warn('PAYMENT', 'Webhook reçu sans référence identifiable', { payload });
+      return { received: false, status: 'MISSING_REFERENCE' };
+    }
+
+    const payment = await PaymentModel.findOne({
+      $or: [
+        { reference: String(reference) },
+        { providerTransactionId: String(reference) },
+      ],
+    });
+
+    if (!payment) {
+      logger.warn('PAYMENT', `Webhook pour transaction introuvable : ${reference}`);
       throw new AppError(ERROR_CODES.PAYMENT_NOT_FOUND, 'Transaction introuvable', 404);
     }
 
-    // Idempotence : si déjà traité avec succès, on ne réapplique pas
     if (payment.status === 'SUCCESS') {
-      logger.info('PAYMENT', `Webhook idempotent ignoré pour : ${payment.reference}`);
       return { received: true, status: 'ALREADY_PROCESSED' };
     }
 
-    payment.rawCallbackPayload = rawPayload || (payload as unknown as Record<string, unknown>);
-    payment.providerTransactionId = paymentData.id || payment.providerTransactionId;
+    payment.rawCallbackPayload = rawPayload || payload;
+    payment.providerTransactionId = String(transaction.id || transaction.reference || reference);
+
+    const eventName = (payload.event || '').toLowerCase();
+    const txnStatus = (transaction.status || data.status || '').toLowerCase();
 
     const isSuccess =
-      payload.event === 'payment.completed' ||
-      payload.event === 'payment.success' ||
-      paymentData.status.toLowerCase() === 'completed' ||
-      paymentData.status.toLowerCase() === 'success';
+      eventName === 'payment.success' ||
+      eventName === 'payment.completed' ||
+      txnStatus === 'completed' ||
+      txnStatus === 'success' ||
+      txnStatus === 'paid';
 
     if (isSuccess) {
       payment.status = 'SUCCESS';
       await payment.save();
 
-      // Activation sécurisée de l'abonnement côté serveur
       const subscription = await SubscriptionService.activateSubscription(
         payment.userId.toString(),
         payment.id,
@@ -196,21 +301,18 @@ export class PaymentService {
       payment.subscriptionId = new Types.ObjectId(subscription.id);
       await payment.save();
 
-      // Envoi de la notification de confirmation
       NotificationService.notifyPaymentSuccess(
         payment.userId.toString(),
         payment.amount,
         payment.reference
       ).catch(() => {});
 
-      logger.info('PAYMENT', `Paiement validé avec succès : ${payment.reference}`);
+      logger.info('PAYMENT', `Webhook validé : abonnement activé pour ${payment.reference}`);
       return { received: true, status: 'SUCCESS' };
     }
 
     payment.status = 'FAILED';
     await payment.save();
-
-    logger.warn('PAYMENT', `Paiement échoué via webhook : ${payment.reference}`);
     return { received: true, status: 'FAILED' };
   }
 

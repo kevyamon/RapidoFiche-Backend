@@ -25,24 +25,30 @@ export const initiatePaymentSchema = z.object({
   }),
 });
 
+export const verifyPaymentSchema = z.object({
+  body: z
+    .object({
+      reference: z.string().trim().optional(),
+    })
+    .optional(),
+  query: z
+    .object({
+      reference: z.string().trim().optional(),
+      ref: z.string().trim().optional(),
+    })
+    .optional(),
+  params: z
+    .object({
+      reference: z.string().trim().optional(),
+    })
+    .optional(),
+});
+
 export const geniusPayWebhookSchema = z.object({
   body: z
     .object({
-      event: z.string().min(1),
-      data: z
-        .object({
-          payment: z
-            .object({
-              id: z.string().optional(),
-              reference: z.string().min(1),
-              amount: z.number().optional(),
-              status: z.string().min(1),
-              currency: z.string().optional(),
-              metadata: z.record(z.unknown()).optional(),
-            })
-            .passthrough(),
-        })
-        .passthrough(),
+      event: z.string().optional(),
+      data: z.record(z.unknown()).optional(),
     })
     .passthrough(),
 });
@@ -62,5 +68,6 @@ export const updateSubscriptionAdminSchema = z.object({
 });
 
 export type InitiatePaymentInput = z.infer<typeof initiatePaymentSchema>['body'];
+export type VerifyPaymentInput = z.infer<typeof verifyPaymentSchema>;
 export type GeniusPayWebhookInput = z.infer<typeof geniusPayWebhookSchema>['body'];
 export type UpdateSubscriptionAdminInput = z.infer<typeof updateSubscriptionAdminSchema>['body'];

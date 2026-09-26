@@ -49,6 +49,41 @@ export class SubscriptionPaymentController {
     }
   }
 
+  public static async verifyPayment(
+    req: Request,
+    res: Response<ApiSuccessResponse<unknown>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      if (!req.user) throw AppError.unauthorized();
+
+      const reference =
+        req.body?.reference ||
+        req.query?.reference ||
+        req.query?.ref ||
+        req.params?.reference;
+
+      const result = await PaymentService.verifyPaymentStatus(
+        req.user.id,
+        reference ? String(reference) : undefined
+      );
+
+      const subscription = await SubscriptionService.getCurrentSubscription(
+        req.user.id
+      );
+
+      res.status(200).json({
+        success: true,
+        data: {
+          ...result,
+          subscription,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   public static async getMyPayments(
     req: Request,
     res: Response<ApiSuccessResponse<unknown>>,
@@ -74,16 +109,22 @@ export class SubscriptionPaymentController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const signature = req.headers['x-geniuspay-signature'] as string | undefined;
+      const signature =
+        (req.headers['x-webhook-signature'] as string | undefined) ||
+        (req.headers['x-geniuspay-signature'] as string | undefined);
+
+      const timestamp =
+        (req.headers['x-webhook-timestamp'] as string | undefined) ||
+        (req.headers['x-geniuspay-timestamp'] as string | undefined);
+
       const rawBody = JSON.stringify(req.body);
 
-      const isValid = GeniusPayService.verifyWebhookSignature(signature, rawBody);
+      const isValid = GeniusPayService.verifyWebhookSignature(signature, rawBody, timestamp);
       if (!isValid) {
         throw AppError.forbidden('Signature de webhook GeniusPay invalide');
       }
 
       const result = await PaymentService.processWebhook(req.body, req.body);
-
       res.status(200).json(result);
     } catch (error) {
       next(error);

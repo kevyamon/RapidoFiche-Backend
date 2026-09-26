@@ -6,6 +6,7 @@ import { env } from './config/env.config';
 import { apiRouter } from './routes/api.router';
 import { errorHandler } from './middlewares/error.middleware';
 import { globalLimiter } from './middlewares/rate-limiter.middleware';
+import { SubscriptionPaymentController } from './controllers/subscription-payment.controller';
 import { AppError } from './utils/app-error.utils';
 
 export function createApp(): Express {
@@ -19,7 +20,7 @@ export function createApp(): Express {
     })
   );
 
-  // 2. Gestion stricte du CORS (Cahier des Charges Section 104)
+  // 2. Gestion du CORS
   app.use(
     cors({
       origin: (origin, callback) => {
@@ -31,7 +32,18 @@ export function createApp(): Express {
       },
       credentials: true,
       methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-Requested-With',
+        'X-Webhook-Signature',
+        'X-Webhook-Timestamp',
+        'X-Webhook-Event',
+        'X-Webhook-Environment',
+        'X-GeniusPay-Signature',
+        'X-GeniusPay-Timestamp',
+        'X-GeniusPay-Event',
+      ],
     })
   );
 
@@ -43,20 +55,23 @@ export function createApp(): Express {
   // 4. Rate limiting global
   app.use('/api', globalLimiter);
 
-  // 5. Point de contrôle santé (CDC Section 133)
+  // 5. Point de contrôle santé
   app.get('/health', (_req: Request, res: Response) => {
-    res.status(200).json({ status: 'ok', version: '2026.09.25.v5' });
+    res.status(200).json({ status: 'ok', version: '2026.09.25.v6' });
   });
 
-  // 6. Montage du routeur API versionné
+  // 6. Route webhook racine directe (compatibilité GeniusPay)
+  app.post('/webhooks/geniuspay', SubscriptionPaymentController.handleWebhook);
+
+  // 7. Montage du routeur API versionné
   app.use('/api/v1', apiRouter);
 
-  // 7. Route 404 pour routes inconnues
+  // 8. Route 404 pour routes inconnues
   app.use((_req: Request, _res: Response) => {
     throw AppError.notFound('La route demandée n’existe pas sur cette API');
   });
 
-  // 8. Gestionnaire d'erreurs centralisé
+  // 9. Gestionnaire d'erreurs centralisé
   app.use(errorHandler);
 
   return app;
