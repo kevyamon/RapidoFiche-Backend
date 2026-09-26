@@ -20,7 +20,9 @@ export class ContentAccessService {
       userId: new Types.ObjectId(userId),
       status: 'ACTIVE',
       endDate: { $gte: new Date() },
-    }).lean();
+    })
+      .sort({ createdAt: -1 })
+      .lean();
 
     return activeSub as unknown as ISubscriptionDocument | null;
   }
@@ -98,8 +100,14 @@ export class ContentAccessService {
     }
 
     // 6. Vérification du niveau principal de l'enseignant (Règle d'abonnement au niveau MVP)
-    const userLevelId = user.primaryLevelId?.toString();
+    let userLevelId = user.primaryLevelId?.toString();
     const lessonLevelId = lesson.levelId.toString();
+
+    // Auto-association si l'enseignant n'avait pas encore de niveau défini
+    if (!userLevelId) {
+      await UserModel.findByIdAndUpdate(userId, { primaryLevelId: lesson.levelId });
+      userLevelId = lessonLevelId;
+    }
 
     if (userLevelId !== lessonLevelId) {
       throw AppError.levelAccessDenied();

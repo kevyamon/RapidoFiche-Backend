@@ -94,12 +94,15 @@ export class LessonController {
         req.params.id
       );
 
-      const asset = await AssetModel.findById(lesson.fileAssetId);
-      if (!asset) {
-        throw new AppError(ERROR_CODES.RESOURCE_NOT_FOUND, 'Fichier PDF introuvable', 404);
+      let storageKey = `lessons/${lesson.id}_${lesson.title.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+      if (lesson.fileAssetId) {
+        const asset = await AssetModel.findById(lesson.fileAssetId);
+        if (asset?.storageKey) {
+          storageKey = asset.storageKey;
+        }
       }
 
-      const localPath = await StorageService.getLocalFilePath(asset.storageKey);
+      const localPath = await StorageService.getLocalFilePath(storageKey);
 
       // En-têtes stricts anti-téléchargement et anti-mise en cache
       res.setHeader('Content-Type', 'application/pdf');

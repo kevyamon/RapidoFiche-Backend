@@ -5,6 +5,7 @@ import { SubscriptionService } from '../src/services/subscription.service';
 import { PaymentModel } from '../src/models/payment.model';
 import { UserModel } from '../src/models/user.model';
 import { SubscriptionPlanModel } from '../src/models/subscription-plan.model';
+import { SubscriptionModel } from '../src/models/subscription.model';
 
 describe('Tests du Workflow de Paiement et Webhook (CDC Sections 142 & 151)', () => {
   const userId = new Types.ObjectId().toString();
@@ -31,11 +32,26 @@ describe('Tests du Workflow de Paiement et Webhook (CDC Sections 142 & 151)', ()
       price: 200,
     } as any);
 
+    vi.spyOn(SubscriptionModel, 'findOne').mockReturnValue({
+      sort: vi.fn().mockResolvedValue(null),
+      populate: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue(null),
+    } as any);
+    vi.spyOn(PaymentModel, 'updateMany').mockResolvedValue({} as any);
+    vi.spyOn(SubscriptionService, 'activateSubscription').mockResolvedValue({
+      id: new Types.ObjectId().toString(),
+    } as any);
     vi.spyOn(PaymentModel, 'create').mockResolvedValue({
       id: paymentId,
       reference,
       save: vi.fn().mockResolvedValue(true),
     } as any);
+
+    const { GeniusPayService } = await import('../src/integrations/payment/geniuspay.service');
+    vi.spyOn(GeniusPayService, 'createPaymentSession').mockResolvedValue({
+      providerTransactionId: 'gp_tx_test',
+      checkoutUrl: 'https://pay.genius.ci/checkout/test',
+    });
 
     const result = await PaymentService.initiateSubscriptionPayment(userId, {
       paymentMethod: 'ALL',
@@ -58,9 +74,10 @@ describe('Tests du Workflow de Paiement et Webhook (CDC Sections 142 & 151)', ()
     };
 
     vi.spyOn(PaymentModel, 'findOne').mockResolvedValue(mockPaymentDoc as any);
+    vi.spyOn(PaymentModel, 'updateMany').mockResolvedValue({} as any);
     const activateSubSpy = vi
       .spyOn(SubscriptionService, 'activateSubscription')
-      .mockResolvedValue({ id: 'sub_123' } as any);
+      .mockResolvedValue({ id: new Types.ObjectId().toString() } as any);
 
     const webhookPayload = {
       event: 'payment.completed',

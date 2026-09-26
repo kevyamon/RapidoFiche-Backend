@@ -11,9 +11,20 @@ import { ERROR_CODES } from '../constants/errors.constants';
 
 export interface LessonAccessInfo {
   lessonId: string;
+  accessToken: string;
+  token: string;
   viewerUrl: string;
   expiresAt: string;
   offlineAllowed: boolean;
+  lesson?: {
+    id: string;
+    title: string;
+    levelId?: unknown;
+    subjectId?: unknown;
+    week?: number;
+    topic?: string;
+    isFavorite?: boolean;
+  };
 }
 
 export class LessonService {
@@ -154,9 +165,20 @@ export class LessonService {
 
     return {
       lessonId: lesson.id,
+      accessToken: token,
+      token,
       viewerUrl: `/api/v1/lessons/${lesson.id}/stream?token=${token}`,
       expiresAt,
       offlineAllowed: true,
+      lesson: {
+        id: lesson.id,
+        title: lesson.title,
+        levelId: lesson.levelId,
+        subjectId: lesson.subjectId,
+        week: lesson.week,
+        topic: lesson.topic,
+        isFavorite: false,
+      },
     };
   }
 }

@@ -40,12 +40,18 @@ export class PaymentService {
       endDate: { $gt: new Date() },
     });
 
-    if (activeSub && activeSub.isCurrentlyActive()) {
-      throw new AppError(
-        ERROR_CODES.CONFLICT,
-        'Vous disposez déjà d’un forfait actif. Le paiement n’est pas nécessaire.',
-        409
-      );
+    if (activeSub) {
+      const isActive = typeof activeSub.isCurrentlyActive === 'function'
+        ? activeSub.isCurrentlyActive()
+        : Boolean(activeSub.status === 'ACTIVE' && activeSub.endDate && new Date() <= new Date(activeSub.endDate));
+
+      if (isActive) {
+        throw new AppError(
+          ERROR_CODES.CONFLICT,
+          'Vous disposez déjà d’un forfait actif. Le paiement n’est pas nécessaire.',
+          409
+        );
+      }
     }
 
     let plan = await SubscriptionPlanModel.findOne({ code: 'ESSENTIEL' });

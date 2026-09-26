@@ -69,7 +69,10 @@ export class PaymentWebhookService {
         payment.amount
       );
 
-      payment.subscriptionId = new Types.ObjectId(subscription.id);
+      const subIdStr = (subscription as any)._id?.toString() || subscription.id;
+      if (subIdStr && Types.ObjectId.isValid(subIdStr)) {
+        payment.subscriptionId = new Types.ObjectId(subIdStr);
+      }
       await payment.save();
 
       // Nettoyer les autres paiements en attente de l'utilisateur
