@@ -46,12 +46,22 @@ export class StorageService {
     return this.uploadToLocalDisk(input, storageKey, checksum);
   }
 
+  public static getStorageDirectory(): string {
+    if (path.isAbsolute(env.STORAGE_LOCAL_PATH)) {
+      return env.STORAGE_LOCAL_PATH;
+    }
+    // Résolution stable absolue par rapport au dossier racine backend
+    const backendRoot = path.resolve(__dirname, '../../../');
+    return path.join(backendRoot, env.STORAGE_LOCAL_PATH);
+  }
+
   private static async uploadToLocalDisk(
     input: UploadFileInput,
     storageKey: string,
     checksum: string
   ): Promise<IAssetDocument> {
-    const fullPath = path.join(process.cwd(), env.STORAGE_LOCAL_PATH, storageKey);
+    const targetDir = this.getStorageDirectory();
+    const fullPath = path.join(targetDir, storageKey);
     const dir = path.dirname(fullPath);
 
     if (!fs.existsSync(dir)) {
@@ -60,8 +70,9 @@ export class StorageService {
 
     await fs.promises.writeFile(fullPath, input.buffer);
 
-    logger.info('STORAGE', `Fichier PDF privé sauvegardé localement : ${storageKey}`, {
+    logger.info('STORAGE', `Fichier PDF original sauvegardé : ${storageKey}`, {
       size: input.sizeBytes,
+      path: fullPath,
     });
 
     return await AssetModel.create({
@@ -119,16 +130,37 @@ export class StorageService {
   }
 
   public static async getLocalFilePath(storageKey: string): Promise<string> {
-    const fullPath = path.join(process.cwd(), env.STORAGE_LOCAL_PATH, storageKey);
-    if (!fs.existsSync(fullPath)) {
-      const dir = path.dirname(fullPath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      const samplePdf = this.generateStandardPdfBuffer(storageKey);
-      await fs.promises.writeFile(fullPath, samplePdf);
+    // 1. Recherche dans le répertoire de stockage canonique
+    const canonicalDir = this.getStorageDirectory();
+    const canonicalPath = path.join(canonicalDir, storageKey);
+    if (fs.existsSync(canonicalPath)) {
+      return canonicalPath;
     }
-    return fullPath;
+
+    // 2. Recherche dans les répertoires relatifs alternatifs (compatibilité des dossiers d'exécution)
+    const alternateCandidates = [
+      path.join(process.cwd(), env.STORAGE_LOCAL_PATH, storageKey),
+      path.join(process.cwd(), 'uploads', storageKey),
+      path.join(process.cwd(), '../uploads', storageKey),
+      path.join(process.cwd(), 'RapidoFiche-Backend', 'uploads', storageKey),
+      path.join(process.cwd(), storageKey),
+    ];
+
+    for (const candidate of alternateCandidates) {
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+
+    // 3. Si introuvable (ex: initialisation ou test vierge), génération de secours dans le dossier canonique
+    const targetDir = path.dirname(canonicalPath);
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    const samplePdf = this.generateStandardPdfBuffer(storageKey);
+    await fs.promises.writeFile(canonicalPath, samplePdf);
+    return canonicalPath;
   }
 
   private static generateStandardPdfBuffer(name: string): Buffer {
