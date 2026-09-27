@@ -19,7 +19,7 @@ const createCustomHandler = (message: string) => {
 
 export const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: env.isProduction ? 200 : 2000,
+  max: env.isProduction ? 600 : 3000,
   standardHeaders: true,
   legacyHeaders: false,
   handler: createCustomHandler(
@@ -29,7 +29,7 @@ export const globalLimiter = rateLimit({
 
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: env.isProduction ? 15 : 100,
+  max: env.isProduction ? 30 : 150,
   standardHeaders: true,
   legacyHeaders: false,
   handler: createCustomHandler(
@@ -39,7 +39,7 @@ export const authLimiter = rateLimit({
 
 export const paymentLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: env.isProduction ? 10 : 100,
+  max: env.isProduction ? 20 : 100,
   standardHeaders: true,
   legacyHeaders: false,
   handler: createCustomHandler(
@@ -49,7 +49,7 @@ export const paymentLimiter = rateLimit({
 
 export const lessonAccessLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: env.isProduction ? 60 : 300,
+  max: env.isProduction ? 120 : 500,
   standardHeaders: true,
   legacyHeaders: false,
   handler: createCustomHandler(

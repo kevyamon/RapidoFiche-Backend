@@ -12,6 +12,9 @@ import { AppError } from './utils/app-error.utils';
 export function createApp(): Express {
   const app = express();
 
+  // 0. Configuration Proxy inverse (Render / Cloudflare / Load Balancers)
+  app.set('trust proxy', 1);
+
   // 1. En-têtes de sécurité HTTP (Helmet)
   app.use(
     helmet({
