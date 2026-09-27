@@ -5,6 +5,7 @@ import { NotificationService } from './notification.service';
 import { AppError } from '../utils/app-error.utils';
 import { ERROR_CODES } from '../constants/errors.constants';
 import { logger } from '../utils/logger.utils';
+import { emitToAdmin } from '../config/socket.config';
 
 export class PaymentWebhookService {
   public static async processWebhook(
@@ -92,6 +93,13 @@ export class PaymentWebhookService {
         payment.amount,
         payment.reference
       ).catch(() => {});
+
+      emitToAdmin('ADMIN_DASHBOARD_UPDATE', {
+        type: 'PAYMENT_RECEIVED',
+        amount: payment.amount,
+        reference: payment.reference,
+        userId: payment.userId.toString(),
+      });
 
       logger.info('PAYMENT', `Webhook validé : abonnement activé pour ${payment.reference}`);
       return { received: true, status: 'SUCCESS' };

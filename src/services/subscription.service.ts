@@ -10,6 +10,7 @@ import { AuditService } from './audit.service';
 import { AppError } from '../utils/app-error.utils';
 import { ERROR_CODES } from '../constants/errors.constants';
 import { logger } from '../utils/logger.utils';
+import { emitToUser, emitToAdmin } from '../config/socket.config';
 
 export interface SubscriptionStatusInfo {
   hasSubscription: boolean;
@@ -140,6 +141,20 @@ export class SubscriptionService {
 
     NotificationService.notifySubscriptionActivated(userId, endDate).catch(() => {});
 
+    emitToUser(userId, 'SUBSCRIPTION_UPDATED', {
+      active: true,
+      status: 'ACTIVE',
+      subscriptionId: subscription.id,
+      startDate,
+      endDate,
+    });
+
+    emitToAdmin('ADMIN_DASHBOARD_UPDATE', {
+      type: 'SUBSCRIPTION_ACTIVATED',
+      userId,
+      amount: _amountPaid,
+    });
+
     logger.info('SUBSCRIPTION', `Abonnement activé pour ${userId} jusqu'au ${endDate.toISOString()}`);
     return subscription;
   }
@@ -162,6 +177,19 @@ export class SubscriptionService {
       subscription.endDate = endDate;
     }
     await subscription.save();
+
+    emitToUser(subscription.userId.toString(), 'SUBSCRIPTION_UPDATED', {
+      active: newStatus === 'ACTIVE',
+      status: newStatus,
+      subscriptionId: subscription.id,
+      endDate: subscription.endDate,
+    });
+
+    emitToAdmin('ADMIN_DASHBOARD_UPDATE', {
+      type: 'SUBSCRIPTION_UPDATED',
+      subscriptionId,
+      status: newStatus,
+    });
 
     // Traçabilité obligatoire (CDC Section 85 & 108)
     await AuditService.logAction(

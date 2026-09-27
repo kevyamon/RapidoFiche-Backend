@@ -4,6 +4,7 @@ import { GeniusPayService } from '../integrations/payment/geniuspay.service';
 import { SubscriptionService } from './subscription.service';
 import { NotificationService } from './notification.service';
 import { logger } from '../utils/logger.utils';
+import { emitToAdmin } from '../config/socket.config';
 
 export interface VerifyPaymentResult {
   verified: boolean;
@@ -107,6 +108,13 @@ export class PaymentVerifyService {
             payment.amount,
             payment.reference
           ).catch(() => {});
+
+          emitToAdmin('ADMIN_DASHBOARD_UPDATE', {
+            type: 'PAYMENT_RECEIVED',
+            amount: payment.amount,
+            reference: payment.reference,
+            userId: payment.userId.toString(),
+          });
 
           logger.info(
             'PAYMENT',

@@ -16,6 +16,7 @@ import {
   GoogleAuthInput,
 } from '../schemas/auth.schema';
 import { logger } from '../utils/logger.utils';
+import { emitToAdmin } from '../config/socket.config';
 
 export interface AuthTokens {
   accessToken: string;
@@ -81,6 +82,12 @@ export class AuthService {
     logger.info('AUTH', `Nouvel enseignant inscrit : ${user.email}`, {
       userId: user.id,
       levelId: level._id.toString(),
+    });
+
+    emitToAdmin('ADMIN_DASHBOARD_UPDATE', {
+      type: 'USER_REGISTERED',
+      userId: user.id,
+      email: user.email,
     });
 
     await user.populate('primaryLevelId', 'code label');
@@ -189,6 +196,11 @@ export class AuthService {
       });
 
       logger.info('AUTH', `Nouvel utilisateur créé via Google : ${user.email}`);
+      emitToAdmin('ADMIN_DASHBOARD_UPDATE', {
+        type: 'USER_REGISTERED',
+        userId: user.id,
+        email: user.email,
+      });
     } else {
       if (!user.googleId) {
         user.googleId = googleProfile.googleId;

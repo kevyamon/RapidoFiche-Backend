@@ -5,6 +5,7 @@ import { LessonModel } from '../models/lesson.model';
 import { PaginationMeta } from '../contracts/api.types';
 import { AppError } from '../utils/app-error.utils';
 import { ERROR_CODES } from '../constants/errors.constants';
+import { emitToUser } from '../config/socket.config';
 
 export class FavoriteHistoryService {
   public static async getFavorites(
@@ -65,12 +66,26 @@ export class FavoriteHistoryService {
       },
       { upsert: true }
     );
+
+    emitToUser(userId, 'FAVORITE_UPDATED', {
+      lessonId,
+      isFavorite: true,
+      lesson: {
+        id: (lesson as any)._id?.toString() || lesson.id,
+        title: lesson.title,
+      },
+    });
   }
 
   public static async removeFavorite(userId: string, lessonId: string): Promise<void> {
     await FavoriteModel.findOneAndDelete({
       userId: new Types.ObjectId(userId),
       lessonId: new Types.ObjectId(lessonId),
+    });
+
+    emitToUser(userId, 'FAVORITE_UPDATED', {
+      lessonId,
+      isFavorite: false,
     });
   }
 

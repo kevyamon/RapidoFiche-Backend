@@ -1,7 +1,9 @@
+import http from 'http';
 import { createApp } from './app';
 import { env } from './config/env.config';
 import { connectDatabase, disconnectDatabase } from './config/database.config';
 import { BootstrapService } from './services/bootstrap.service';
+import { initSocketServer } from './config/socket.config';
 import { logger } from './utils/logger.utils';
 
 async function bootstrap() {
@@ -15,14 +17,19 @@ async function bootstrap() {
     // 3. Initialisation de l'application Express
     const app = createApp();
 
-    // 3. Démarrage du serveur HTTP
-    const server = app.listen(env.PORT, () => {
+    // 3. Initialisation du serveur HTTP et Socket.IO
+    const server = http.createServer(app);
+    initSocketServer(server);
+
+    // 4. Démarrage de l'écoute réseau
+    server.listen(env.PORT, () => {
       logger.info(
         'SYSTEM',
         `Serveur RapidoFiche Backend démarré en mode ${env.NODE_ENV} sur le port ${env.PORT}`
       );
       logger.info('SYSTEM', `Point de santé : http://localhost:${env.PORT}/health`);
       logger.info('SYSTEM', `API Base URL : http://localhost:${env.PORT}/api/v1`);
+      logger.info('SYSTEM', `Temps réel Socket.IO activé`);
     });
 
     // 4. Arrêt gracieux (Graceful Shutdown)

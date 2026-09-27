@@ -6,6 +6,7 @@ import { PaginationMeta } from '../contracts/api.types';
 import { AppError } from '../utils/app-error.utils';
 import { ERROR_CODES } from '../constants/errors.constants';
 import { ROLES, UserRole } from '../constants/roles.constants';
+import { emitToUser, emitToAdmin } from '../config/socket.config';
 
 export interface QueryUsersInput {
   page?: number;
@@ -130,6 +131,10 @@ export class AdminUserService {
     user.status = 'SUSPENDED';
     await user.save();
 
+    emitToUser(userId, 'USER_STATUS_UPDATED', { status: 'SUSPENDED' });
+    emitToAdmin('ADMIN_DASHBOARD_UPDATE', { type: 'USER_SUSPENDED', userId });
+    emitToAdmin('ADMIN_USERS_UPDATED', { userId, status: 'SUSPENDED' });
+
     await AuditService.logAction(adminId, 'USER_SUSPENDED', 'User', userId, {
       targetRole: user.role,
       reason: reason || 'Suspension administrative',
@@ -165,6 +170,10 @@ export class AdminUserService {
     user.status = 'ACTIVE';
     await user.save();
 
+    emitToUser(userId, 'USER_STATUS_UPDATED', { status: 'ACTIVE' });
+    emitToAdmin('ADMIN_DASHBOARD_UPDATE', { type: 'USER_REACTIVATED', userId });
+    emitToAdmin('ADMIN_USERS_UPDATED', { userId, status: 'ACTIVE' });
+
     await AuditService.logAction(adminId, 'USER_REACTIVATED', 'User', userId, {
       targetRole: user.role,
     });
@@ -197,6 +206,10 @@ export class AdminUserService {
     const previousLevelId = user.primaryLevelId?.toString();
     user.primaryLevelId = new Types.ObjectId(newLevelId);
     await user.save();
+
+    emitToUser(userId, 'USER_STATUS_UPDATED', { primaryLevelId: newLevelId });
+    emitToAdmin('ADMIN_DASHBOARD_UPDATE', { type: 'USER_LEVEL_CHANGED', userId });
+    emitToAdmin('ADMIN_USERS_UPDATED', { userId, primaryLevelId: newLevelId });
 
     await AuditService.logAction(adminId, 'LEVEL_CHANGED', 'User', userId, {
       previousLevelId,

@@ -6,6 +6,7 @@ import { UpdateProfileInput } from '../schemas/auth.schema';
 import { AppError } from '../utils/app-error.utils';
 import { ERROR_CODES } from '../constants/errors.constants';
 import { logger } from '../utils/logger.utils';
+import { emitToUser, emitToAdmin } from '../config/socket.config';
 
 export class UserProfileService {
   public static async updateProfile(
@@ -68,6 +69,15 @@ export class UserProfileService {
 
     await user.save();
     await user.populate('primaryLevelId', 'code label');
+
+    emitToUser(userId, 'USER_PROFILE_UPDATED', {
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      phone: user.phone,
+      primaryLevelId: user.primaryLevelId,
+    });
+    emitToAdmin('ADMIN_DASHBOARD_UPDATE', { type: 'USER_PROFILE_UPDATED', userId });
 
     logger.info('USER', `Profil mis à jour pour : ${user.email}`);
     return user;

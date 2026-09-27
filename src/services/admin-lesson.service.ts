@@ -6,6 +6,7 @@ import { CreateLessonInput, UpdateLessonInput } from '../schemas/lesson.schema';
 import { AuditService } from './audit.service';
 import { AppError } from '../utils/app-error.utils';
 import { ERROR_CODES } from '../constants/errors.constants';
+import { emitToAdmin, emitToAll } from '../config/socket.config';
 
 export class AdminLessonService {
   public static async createLesson(
@@ -28,6 +29,9 @@ export class AdminLessonService {
       title: lesson.title,
       levelId: input.levelId,
     });
+
+    emitToAdmin('ADMIN_DASHBOARD_UPDATE', { type: 'LESSONS_CHANGED' });
+    emitToAdmin('LESSON_CREATED', { lessonId: lesson.id });
 
     return lesson;
   }
@@ -87,6 +91,9 @@ export class AdminLessonService {
     lesson.updatedBy = new Types.ObjectId(adminId);
     await lesson.save();
 
+    emitToAdmin('ADMIN_DASHBOARD_UPDATE', { type: 'LESSONS_CHANGED' });
+    emitToAll('CATALOG_UPDATED', { lessonId: lesson.id, status: lesson.status });
+
     return lesson;
   }
 
@@ -111,6 +118,9 @@ export class AdminLessonService {
       title: lesson.title,
     });
 
+    emitToAdmin('ADMIN_DASHBOARD_UPDATE', { type: 'LESSONS_CHANGED' });
+    emitToAll('CATALOG_UPDATED', { lessonId: lesson.id, status: 'PUBLISHED' });
+
     return lesson;
   }
 
@@ -130,6 +140,9 @@ export class AdminLessonService {
     lesson.status = 'DRAFT';
     lesson.updatedBy = new Types.ObjectId(adminId);
     await lesson.save();
+
+    emitToAdmin('ADMIN_DASHBOARD_UPDATE', { type: 'LESSONS_CHANGED' });
+    emitToAll('CATALOG_UPDATED', { lessonId: lesson.id, status: 'DRAFT' });
 
     return lesson;
   }
@@ -152,6 +165,9 @@ export class AdminLessonService {
     await lesson.save();
 
     await AuditService.logAction(adminId, 'LESSON_ARCHIVED', 'Lesson', lessonId);
+
+    emitToAdmin('ADMIN_DASHBOARD_UPDATE', { type: 'LESSONS_CHANGED' });
+    emitToAll('CATALOG_UPDATED', { lessonId: lesson.id, status: 'ARCHIVED' });
 
     return lesson;
   }

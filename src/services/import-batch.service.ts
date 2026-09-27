@@ -8,6 +8,7 @@ import { ImportParserService } from './import-parser.service';
 import { AuditService } from './audit.service';
 import { AppError } from '../utils/app-error.utils';
 import { ERROR_CODES } from '../constants/errors.constants';
+import { emitToAdmin } from '../config/socket.config';
 
 export class ImportBatchService {
   public static async processUploadedFiles(
@@ -144,7 +145,7 @@ export class ImportBatchService {
 
     const finalStatus = createdLessons > 0 ? 'COMPLETED' : (failed === files.length ? 'FAILED' : 'REVIEW_REQUIRED');
 
-    return await ImportBatchModel.create({
+    const createdBatch = await ImportBatchModel.create({
       createdBy: new Types.ObjectId(adminId),
       status: finalStatus,
       totalFiles: files.length,
@@ -152,6 +153,11 @@ export class ImportBatchService {
       failedFiles: failed,
       files: batchItems,
     });
+
+    emitToAdmin('ADMIN_DASHBOARD_UPDATE', { type: 'IMPORT_BATCH_PROCESSED', batchId: createdBatch.id });
+    emitToAdmin('ADMIN_BATCH_UPDATED', { batchId: createdBatch.id });
+
+    return createdBatch;
   }
 
   private static async createLessonFromItem(
@@ -245,6 +251,9 @@ export class ImportBatchService {
     await AuditService.logAction(adminId, 'IMPORT_CONFIRMED', 'ImportBatch', batchId, {
       importedLessonsCount: createdCount,
     });
+
+    emitToAdmin('ADMIN_DASHBOARD_UPDATE', { type: 'IMPORT_BATCH_CONFIRMED', batchId });
+    emitToAdmin('ADMIN_BATCH_UPDATED', { batchId });
 
     return batch;
   }
