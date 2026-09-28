@@ -11,6 +11,7 @@ export interface IAsset {
   checksum?: string;
   visibility: AssetVisibility;
   publicUrl?: string;
+  data?: Buffer;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,6 +30,7 @@ const assetSchema = new Schema<IAssetDocument>(
       type: String,
       required: [true, 'La clé de stockage est obligatoire'],
       trim: true,
+      index: true,
     },
     originalName: {
       type: String,
@@ -48,6 +50,10 @@ const assetSchema = new Schema<IAssetDocument>(
     checksum: {
       type: String,
       trim: true,
+    },
+    data: {
+      type: Buffer,
+      select: false, // Ne pas charger le buffer par défaut dans les requêtes de métadonnées
     },
     visibility: {
       type: String,

@@ -82,6 +82,7 @@ export class StorageService {
       mimeType: input.mimeType,
       sizeBytes: input.sizeBytes,
       checksum,
+      data: input.buffer,
       visibility: 'PRIVATE',
     });
   }
@@ -118,6 +119,7 @@ export class StorageService {
             mimeType: input.mimeType,
             sizeBytes: input.sizeBytes,
             checksum,
+            data: input.buffer,
             visibility: 'PRIVATE',
           });
 
@@ -137,7 +139,7 @@ export class StorageService {
       return canonicalPath;
     }
 
-    // 2. Recherche dans les répertoires relatifs alternatifs (compatibilité des dossiers d'exécution)
+    // 2. Recherche dans les répertoires relatifs alternatifs
     const alternateCandidates = [
       path.join(process.cwd(), env.STORAGE_LOCAL_PATH, storageKey),
       path.join(process.cwd(), 'uploads', storageKey),
@@ -152,12 +154,20 @@ export class StorageService {
       }
     }
 
-    // 3. Si introuvable (ex: initialisation ou test vierge), génération de secours dans le dossier canonique
+    // 3. Restauration automatique depuis la persistance MongoDB Atlas (Protection Render Ephemeral FS)
+    const asset = await AssetModel.findOne({ storageKey }).select('+data');
     const targetDir = path.dirname(canonicalPath);
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
     }
 
+    if (asset && asset.data && asset.data.length > 0) {
+      await fs.promises.writeFile(canonicalPath, asset.data);
+      logger.info('STORAGE', `Fichier PDF restauré avec succès depuis MongoDB : ${storageKey}`);
+      return canonicalPath;
+    }
+
+    // 4. Fallback synthétique uniquement si aucun fichier n'a jamais été téléversé
     const samplePdf = this.generateStandardPdfBuffer(storageKey);
     await fs.promises.writeFile(canonicalPath, samplePdf);
     return canonicalPath;
