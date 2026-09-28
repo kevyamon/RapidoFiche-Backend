@@ -1,12 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { AdminAuthService } from '../services/admin-auth.service';
-import { env } from '../config/env.config';
 import { ApiSuccessResponse } from '../contracts/api.types';
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: env.isProduction,
-  sameSite: (env.isProduction ? 'none' : 'lax') as 'none' | 'lax',
+  secure: true,
+  sameSite: 'none' as const,
   maxAge: 30 * 24 * 60 * 60 * 1000, // 30 jours
 };
 

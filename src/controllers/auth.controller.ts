@@ -1,14 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/auth.service';
-import { env } from '../config/env.config';
 import { ApiSuccessResponse } from '../contracts/api.types';
 import { AppError } from '../utils/app-error.utils';
 import { UserModel } from '../models/user.model';
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: env.isProduction,
-  sameSite: (env.isProduction ? 'strict' : 'lax') as 'strict' | 'lax',
+  secure: true,
+  sameSite: 'none' as const,
   maxAge: 30 * 24 * 60 * 60 * 1000, // 30 jours
 };
 
@@ -112,8 +111,8 @@ export class AuthController {
     try {
       res.clearCookie('refresh_token', {
         httpOnly: true,
-        secure: env.isProduction,
-        sameSite: env.isProduction ? 'strict' : 'lax',
+        secure: true,
+        sameSite: 'none',
       });
 
       res.status(200).json({

@@ -85,7 +85,14 @@ export class AdminLessonService {
     if (input.description !== undefined) lesson.description = input.description ?? undefined;
     if (input.status) lesson.status = input.status;
     if (input.sourceType) lesson.sourceType = input.sourceType;
-    if (input.rightsStatus) lesson.rightsStatus = input.rightsStatus;
+    if (input.fileAssetId) {
+      lesson.fileAssetId = new Types.ObjectId(input.fileAssetId);
+    }
+    if (input.thumbnailAssetId !== undefined) {
+      lesson.thumbnailAssetId = input.thumbnailAssetId
+        ? new Types.ObjectId(input.thumbnailAssetId)
+        : undefined;
+    }
     if (input.order !== undefined) lesson.order = input.order;
 
     lesson.updatedBy = new Types.ObjectId(adminId);
