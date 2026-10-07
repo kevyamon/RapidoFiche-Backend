@@ -21,6 +21,7 @@ export interface PaymentInitiationResult {
   checkoutUrl: string;
   amount: number;
   currency: 'XOF';
+  isMock: boolean;
 }
 
 export class PaymentService {
@@ -142,6 +143,7 @@ export class PaymentService {
         checkoutUrl: targetUrl,
         amount,
         currency: 'XOF',
+        isMock: true,
       };
     }
 
@@ -175,6 +177,7 @@ export class PaymentService {
       checkoutUrl: session.checkoutUrl,
       amount,
       currency: 'XOF',
+      isMock: false,
     };
   }
 

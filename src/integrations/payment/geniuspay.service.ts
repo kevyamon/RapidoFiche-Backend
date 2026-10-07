@@ -56,6 +56,11 @@ export class GeniusPayService {
     const apiKey = (env.GENIUSPAY_API_KEY || '').trim();
     const apiSecret = (env.GENIUSPAY_API_SECRET || '').trim();
 
+    let cleanPhone = params.customerPhone ? params.customerPhone.replace(/[\s\-().]/g, '') : undefined;
+    if (cleanPhone && cleanPhone.startsWith('0') && cleanPhone.length === 10) {
+      cleanPhone = `+225${cleanPhone}`;
+    }
+
     try {
       const payload: Record<string, unknown> = {
         amount: Math.max(200, Math.round(params.amount)),
@@ -64,7 +69,7 @@ export class GeniusPayService {
         customer: {
           name: params.customerName || 'Enseignant RapidoFiche',
           email: params.customerEmail || 'enseignant@rapidofiche.ci',
-          phone: params.customerPhone || undefined,
+          phone: cleanPhone,
         },
         success_url: finalReturnUrl,
         error_url: `${env.FRONTEND_URL}/fiches?payment=cancelled&ref=${params.reference}`,
@@ -91,9 +96,16 @@ export class GeniusPayService {
       const checkoutUrl =
         dataObj?.checkout_url ||
         dataObj?.payment_url ||
+        dataObj?.redirect_url ||
         dataObj?.url ||
         dataObj?.link ||
-        responseData?.checkout_url;
+        dataObj?.paymentUrl ||
+        dataObj?.checkoutUrl ||
+        dataObj?.data?.checkout_url ||
+        dataObj?.data?.payment_url ||
+        responseData?.checkout_url ||
+        responseData?.payment_url ||
+        responseData?.url;
 
       const providerReference = dataObj?.reference || params.reference;
       const providerTransactionId =
@@ -102,7 +114,7 @@ export class GeniusPayService {
         dataObj?.payment?.id?.toString() ||
         providerReference;
 
-      if (!checkoutUrl) {
+      if (!checkoutUrl || typeof checkoutUrl !== 'string') {
         logger.error('PAYMENT', 'URL de paiement introuvable dans la réponse GeniusPay', {
           response: responseData,
         });
