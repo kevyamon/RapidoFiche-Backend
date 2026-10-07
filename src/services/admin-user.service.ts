@@ -20,18 +20,14 @@ export interface QueryUsersInput {
 export class AdminUserService {
   public static async getUsers(
     query: QueryUsersInput,
-    requesterRole?: UserRole
+    _requesterRole?: UserRole
   ): Promise<{ users: IUserDocument[]; pagination: PaginationMeta }> {
     const filter: Record<string, unknown> = {};
 
-    // Si le demandeur n'est pas SUPER_ADMIN, il ne peut absolument pas voir les Superadmins
-    if (requesterRole !== ROLES.SUPER_ADMIN) {
-      filter.role = query.role && query.role !== ROLES.SUPER_ADMIN
-        ? query.role
-        : { $ne: ROLES.SUPER_ADMIN };
-    } else if (query.role) {
-      filter.role = query.role;
-    }
+    // Exclure systématiquement le compte SUPER_ADMIN de la liste des utilisateurs
+    filter.role = query.role && query.role !== ROLES.SUPER_ADMIN
+      ? query.role
+      : { $ne: ROLES.SUPER_ADMIN };
 
     if (query.status) {
       filter.status = query.status;

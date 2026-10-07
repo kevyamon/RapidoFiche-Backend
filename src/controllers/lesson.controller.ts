@@ -20,7 +20,8 @@ export class LessonController {
       const result = await LessonService.getLessons(
         req.query as unknown as QueryLessonsInput,
         req.user?.role,
-        req.user?.primaryLevelId
+        req.user?.primaryLevelId,
+        req.user?.id
       );
 
       res.status(200).json({
@@ -39,7 +40,11 @@ export class LessonController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const lesson = await LessonService.getLessonById(req.params.id, req.user?.role);
+      const lesson = await LessonService.getLessonById(
+        req.params.id,
+        req.user?.role,
+        req.user?.id
+      );
       res.status(200).json({ success: true, data: lesson });
     } catch (error) {
       next(error);

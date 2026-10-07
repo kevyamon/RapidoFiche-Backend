@@ -1,5 +1,6 @@
 import { Types } from 'mongoose';
 import { LessonModel, ILessonDocument } from '../models/lesson.model';
+import { FavoriteModel } from '../models/favorite.model';
 import { QueryLessonsInput } from '../schemas/lesson.schema';
 import { ContentAccessService } from './content-access.service';
 import { FavoriteHistoryService } from './favorite-history.service';
@@ -31,7 +32,8 @@ export class LessonService {
   public static async getLessons(
     query: QueryLessonsInput,
     userRole?: UserRole,
-    userPrimaryLevelId?: string
+    userPrimaryLevelId?: string,
+    userId?: string
   ): Promise<{ lessons: ILessonDocument[]; pagination: PaginationMeta }> {
     const filter: Record<string, unknown> = {};
 
@@ -81,7 +83,7 @@ export class LessonService {
     const limit = query.limit || 20;
     const skip = (page - 1) * limit;
 
-    const [lessons, total] = await Promise.all([
+    const [lessons, total, userFavorites] = await Promise.all([
       LessonModel.find(filter)
         .populate('levelId', 'code label')
         .populate('subjectId', 'name icon')
@@ -91,13 +93,24 @@ export class LessonService {
         .limit(limit)
         .lean(),
       LessonModel.countDocuments(filter),
+      userId && Types.ObjectId.isValid(userId)
+        ? FavoriteModel.find({ userId: new Types.ObjectId(userId) }).select('lessonId').lean()
+        : Promise.resolve([]),
     ]);
 
+    const favSet = new Set(
+      userFavorites.map((f: any) => f.lessonId?.toString()).filter(Boolean)
+    );
+
     const totalPages = Math.ceil(total / limit) || 1;
-    const normalizedLessons = lessons.map((l: any) => ({
-      ...l,
-      id: l._id?.toString() || l.id,
-    }));
+    const normalizedLessons = lessons.map((l: any) => {
+      const id = l._id?.toString() || l.id;
+      return {
+        ...l,
+        id,
+        isFavorite: favSet.has(id),
+      };
+    });
 
     return {
       lessons: normalizedLessons as unknown as ILessonDocument[],
@@ -114,7 +127,8 @@ export class LessonService {
 
   public static async getLessonById(
     lessonId: string,
-    userRole?: UserRole
+    userRole?: UserRole,
+    userId?: string
   ): Promise<ILessonDocument> {
     const lesson = await LessonModel.findById(lessonId)
       .populate('levelId', 'code label')
@@ -135,9 +149,15 @@ export class LessonService {
       throw new AppError(ERROR_CODES.LESSON_NOT_AVAILABLE, 'Fiche non disponible', 403);
     }
 
+    let isFavorite = false;
+    if (userId && Types.ObjectId.isValid(userId)) {
+      isFavorite = await FavoriteHistoryService.isFavorite(userId, lessonId);
+    }
+
     return {
       ...lesson,
       id: (lesson as any)._id?.toString() || (lesson as any).id,
+      isFavorite,
     } as unknown as ILessonDocument;
   }
 
@@ -162,6 +182,7 @@ export class LessonService {
 
     // Enregistrement automatique dans l'historique sans bloquer la réponse
     FavoriteHistoryService.recordView(userId, lessonId).catch(() => { });
+    const isFavorite = await FavoriteHistoryService.isFavorite(userId, lessonId);
 
     return {
       lessonId: lesson.id,
@@ -177,8 +198,9 @@ export class LessonService {
         subjectId: lesson.subjectId,
         week: lesson.week,
         topic: lesson.topic,
-        isFavorite: false,
+        isFavorite,
       },
     };
   }
 }
+

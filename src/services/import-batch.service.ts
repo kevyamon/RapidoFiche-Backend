@@ -73,24 +73,13 @@ export class ImportBatchService {
         }
 
         let subjectId = explicitSubjectDoc?._id;
-        let subjectName = explicitSubjectDoc?.name || parsed.subjectKeyword;
+        let subjectName = explicitSubjectDoc?.name;
 
-        if (!subjectId && parsed.subjectKeyword && levelId) {
-          const subjectDoc = await SubjectModel.findOne({
-            name: new RegExp(parsed.subjectKeyword, 'i'),
-            levelIds: levelId,
-          }).lean();
-          if (subjectDoc) {
-            subjectId = subjectDoc._id;
-            subjectName = subjectDoc.name;
-          }
-        }
-
-        if (!subjectId && levelId) {
-          const fallbackSub = await SubjectModel.findOne({ levelIds: levelId }).lean();
-          if (fallbackSub) {
-            subjectId = fallbackSub._id;
-            subjectName = fallbackSub.name;
+        if (!subjectId) {
+          const matchedSubject = await this.findMatchingSubject(parsed, levelId);
+          if (matchedSubject) {
+            subjectId = matchedSubject.id;
+            subjectName = matchedSubject.name;
           }
         }
 
@@ -124,7 +113,7 @@ export class ImportBatchService {
           parsedData: {
             levelCode: levelCode as any,
             levelId,
-            subjectName,
+            subjectName: subjectName || 'Général',
             subjectId,
             week: parsed.week || 1,
             topic: parsed.topic || title,
@@ -158,6 +147,36 @@ export class ImportBatchService {
     emitToAdmin('ADMIN_BATCH_UPDATED', { batchId: createdBatch.id });
 
     return createdBatch;
+  }
+
+  private static async findMatchingSubject(
+    parsed: { subjectSlug?: string; subjectKeyword?: string },
+    levelId?: Types.ObjectId
+  ): Promise<{ id: Types.ObjectId; name: string } | null> {
+    if (parsed.subjectSlug && levelId) {
+      const doc = await SubjectModel.findOne({ slug: parsed.subjectSlug, levelIds: levelId }).lean();
+      if (doc) return { id: doc._id as Types.ObjectId, name: doc.name };
+    }
+    if (parsed.subjectSlug) {
+      const doc = await SubjectModel.findOne({ slug: parsed.subjectSlug }).lean();
+      if (doc) return { id: doc._id as Types.ObjectId, name: doc.name };
+    }
+    if (parsed.subjectKeyword) {
+      const esc = parsed.subjectKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (levelId) {
+        const doc = await SubjectModel.findOne({ name: new RegExp(`^${esc}$`, 'i'), levelIds: levelId }).lean();
+        if (doc) return { id: doc._id as Types.ObjectId, name: doc.name };
+      }
+      const docGlobal = await SubjectModel.findOne({ name: new RegExp(`^${esc}$`, 'i') }).lean();
+      if (docGlobal) return { id: docGlobal._id as Types.ObjectId, name: docGlobal.name };
+    }
+    if (levelId) {
+      const fallback = await SubjectModel.findOne({ levelIds: levelId }).lean();
+      if (fallback) return { id: fallback._id as Types.ObjectId, name: fallback.name };
+    }
+    const defaultSub = await SubjectModel.findOne({ active: true }).sort({ order: 1 }).lean();
+    if (defaultSub) return { id: defaultSub._id as Types.ObjectId, name: defaultSub.name };
+    return null;
   }
 
   private static async createLessonFromItem(

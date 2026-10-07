@@ -6,45 +6,103 @@ export interface ParsedFileInfo {
   originalName: string;
   levelCode?: EducationLevelCode;
   subjectKeyword?: string;
+  subjectSlug?: string;
   week?: number;
   topic?: string;
   suggestedTitle: string;
   isCompliant: boolean;
 }
 
-// Dictionnaire de correspondances pédagogiques (ordonné par spécificité décroissante)
-const COMPOUND_SUBJECT_PATTERNS: Array<{ regex: RegExp; standardName: string }> = [
-  { regex: /\b(?:histoire[\s_-]*g[eé]o(?:graphie)?|hg)\b/i, standardName: 'Histoire-Géographie' },
-  { regex: /\b(?:exploitation\s+de\s+(?:texte|t)|expression\s+[eé]crite|orthographe|grammaire|vocabulaire|po[eé]sie|conjugaison)\b/i, standardName: 'Français' },
-  { regex: /\b(?:sciences?(?:\s+et\s+techno(?:logie)?)?|svt|physique(?:\s+chimie)?)\b/i, standardName: 'Sciences et Technologie' },
-  { regex: /\b(?:arts?\s+plastiques?|a\.?e\.?c\.?|dessin)\b/i, standardName: 'Arts Plastiques' },
-  { regex: /\b(?:[eé]ducation\s+civique|edhc)\b/i, standardName: 'EDHC' },
-  { regex: /\b(?:math[eé]matiques?|maths?|calcul|arithm[eé]tique|g[eé]om[eé]trie)\b/i, standardName: 'Mathématiques' },
-  { regex: /\b(?:fran[cç]ais|[eé]criture|lecture)\b/i, standardName: 'Français' },
-  { regex: /\b(?:anglais|english)\b/i, standardName: 'Anglais' },
-  { regex: /\b(?:e\.?p\.?s\.?|[eé]ducation\s+physique|sport)\b/i, standardName: 'EPS' },
+interface SubjectPattern {
+  regex: RegExp;
+  standardName: string;
+  slug: string;
+}
+
+// Dictionnaire de correspondances pédagogiques par ordre strict de spécificité
+const SUBJECT_PATTERNS: SubjectPattern[] = [
+  // 1. Histoire-Géographie (prioritaire pour éviter les faux positifs 'geo' ou 'hist')
+  {
+    regex: /\b(?:histoire[\s_-]*g[eé]o(?:graphie)?|h[\s._-]*g|hist[\s._-]*g[eé]o|histoire|g[eé]ographie|hist|g[eé]o)\b/i,
+    standardName: 'Histoire-Géographie',
+    slug: 'histoire-geographie',
+  },
+  // 2. EDHC / Éducation Civique / Morale
+  {
+    regex: /\b(?:edhc|e[\s._-]*d[\s._-]*h[\s._-]*c|[eé]ducation\s+civique|instruction\s+civique|civisme|morale|citoyennet[eé]|droits?\s+(?:de\s+l['’]\s*homme|humains?|de\s+l['’]\s*enfant)|vivre\s+ensemble|secourisme|s[eé]curit[eé]\s+routi[eè]re)\b/i,
+    standardName: 'EDHC',
+    slug: 'edhc',
+  },
+  // 3. Sciences et Technologie / SVT / Physique-Chimie / Éveil
+  {
+    regex: /\b(?:sciences?(?:\s+et\s+techno(?:logie)?)?|sc(?:iences?)?[\s._-]*techno(?:logie)?|sc[\s._-]*tech|svt|s[\s._-]*v[\s._-]*t|physique(?:\s*[\s_-]*\s*chimie)?|p[\s._-]*c|chimie|[eé]veil|d[eé]couverte\s+du\s+monde|le[cç]on\s+de\s+choses|observation|biologie|corps\s+humain|hygi[eè]ne|sant[eé]|germination|[eé]lectricit[eé]|astronomie|mati[eè]re)\b/i,
+    standardName: 'Sciences et Technologie',
+    slug: 'sciences-technologie',
+  },
+  // 4. Français / Sous-disciplines littéraires
+  {
+    regex: /\b(?:fran[cç]ais|fra|fr\b|exploitation\s+de\s+(?:texte|t)|[eé]tude\s+de\s+texte|compr[eé]hension(?:\s+de\s+texte)?|production\s+(?:d['’]\s*)?[eé]crit(?:e)?|expression\s+[eé]crite|expression\s+orale|orthographe|ortho\b|grammaire|gram\b|gramm\b|vocabulaire|vocab\b|lexique|conjugaison|conj\b|dict[eé]e?s?|lecture|lectures|[eé]criture|graphisme|calligraphie|po[eé]sie|r[eé]citation|comptine|phon[eé]tique|langage|communication)\b/i,
+    standardName: 'Français',
+    slug: 'francais',
+  },
+  // 5. Mathématiques / Sous-disciplines mathématiques
+  {
+    regex: /\b(?:math[eé]matiques?|maths?|mat\b|calcul(?:s|\s+mental|\s+rapide)?|arithm[eé]tique|alg[eè]bre|g[eé]om[eé]trie|num[eé]ration|grandeurs?(?:\s+et\s+mesures?)?|mesures?|r[eé]solution\s+de\s+probl[eè]mes?|probl[eè]mes?|op[eé]rations?|fractions?|pourcentages?|proportionnalit[eé]|multiplications?|divisions?|additions?|soustractions?)\b/i,
+    standardName: 'Mathématiques',
+    slug: 'mathematiques',
+  },
+  // 6. Arts Plastiques / AEC
+  {
+    regex: /\b(?:arts?\s+plastiques?|a[\s._-]*e[\s._-]*c|dessin|peinture|chant|musique|bricolage|arts?)\b/i,
+    standardName: 'Arts Plastiques',
+    slug: 'arts-plastiques',
+  },
+  // 7. EPS
+  {
+    regex: /\b(?:eps|e[\s._-]*p[\s._-]*s|[eé]ducation\s+physique|sport|motricit[eé]|gymnastique)\b/i,
+    standardName: 'EPS',
+    slug: 'eps',
+  },
+  // 8. Anglais
+  {
+    regex: /\b(?:anglais|english|ang\b)\b/i,
+    standardName: 'Anglais',
+    slug: 'anglais',
+  },
 ];
 
 export class ImportParserService {
   public static parseFileName(fileName: string): ParsedFileInfo {
     const baseName = path.parse(fileName).name;
-    const cleanStr = baseName.replace(/[._-]+/g, ' ').trim();
+
+    // Découpage camelCase et standardisation des séparateurs
+    const spaced = baseName
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+      .replace(/[._\-–—[\](){}<>,;:!/?+='"~#&]+/g, ' ')
+      .trim();
+
+    // Normalisation textuelle pour faciliter la détection
+    const normalizedNoAccents = spaced
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
 
     let levelCode: EducationLevelCode | undefined;
     let subjectKeyword: string | undefined;
+    let subjectSlug: string | undefined;
     let week: number | undefined;
 
-    // 1. Détection du Niveau (CP1, CP2, CE1, CE2, CM1, CM2)
+    // 1. Détection du Niveau (PS, MS, GS, CP1, CP2, CE1, CE2, CM1, CM2)
     for (const code of EDUCATION_LEVEL_CODES) {
       const levelRegex = new RegExp(`\\b${code}\\b`, 'i');
-      if (levelRegex.test(cleanStr)) {
+      if (levelRegex.test(spaced)) {
         levelCode = code;
         break;
       }
     }
 
-    // 2. Détection de la Semaine (ex: Semaine 12, Sem12, S12, W12)
-    const weekMatch = cleanStr.match(/\b(?:semaine|sem|s|w)\s*([0-9]{1,2})\b/i);
+    // 2. Détection de la Semaine (ex: Semaine 12, Sem12, S12, W12, Semaine_04)
+    const weekMatch = spaced.match(/\b(?:semaine|sem|s|w)\s*([0-9]{1,2})\b/i);
     if (weekMatch) {
       const parsedWeek = parseInt(weekMatch[1], 10);
       if (parsedWeek >= 1 && parsedWeek <= 52) {
@@ -52,38 +110,46 @@ export class ImportParserService {
       }
     }
 
-    // 3. Détection de la Matière via les patterns ordonnés
-    for (const pattern of COMPOUND_SUBJECT_PATTERNS) {
-      if (pattern.regex.test(cleanStr)) {
+    // 3. Détection de la Matière via les patterns ordonnés (sur version avec et sans accents)
+    for (const pattern of SUBJECT_PATTERNS) {
+      if (pattern.regex.test(spaced) || pattern.regex.test(normalizedNoAccents)) {
         subjectKeyword = pattern.standardName;
+        subjectSlug = pattern.slug;
         break;
       }
     }
 
-    // 4. Nettoyage du titre : suppression des bruits et artefacts fréquents
-    let cleanedTitle = cleanStr
-      // Supprimer timestamps (ex: 221028 101140)
-      .replace(/\b\d{6,8}\s+\d{6}\b/g, '')
-      // Supprimer mentions "recadrée", "ok", "ok-1", "tome 1", "partie 1", "page"
-      .replace(/\b(?:recadr[eé]e?|ok\b(?:\s*\d+)?|partie\s*\d+|tome\s*\d+|version\s*\d+|copie)\b/gi, '')
-      // Supprimer le code de classe et la semaine déjà extraits
-      .replace(new RegExp(`\\b(?:CP1|CP2|CE1|CE2|CM1|CM2)\\b`, 'gi'), '')
+    // 4. Nettoyage du sujet / sujet résiduel pour extraire le thème pédagogique
+    let cleanedTopic = spaced
+      // Supprimer les timestamps
+      .replace(/\b\d{6,8}\s+\d{4,6}\b/g, '')
+      .replace(/\b\d{6,14}\b/g, '')
+      // Supprimer les mentions de bruit et versions
+      .replace(/\b(?:recadr[eé]e?|ok\b(?:\s*\d+)?|partie\s*\d+|tome\s*\d+|version\s*\d+|v\d+|copie|fiche|le[cç]on|cours)\b/gi, '')
+      // Supprimer le code de classe extrait ou présent
+      .replace(/\b(?:PS|MS|GS|CP1|CP2|CE1|CE2|CM1|CM2)\b/gi, '')
+      // Supprimer les mentions de semaine
       .replace(/\b(?:semaine|sem|s|w)\s*[0-9]{1,2}\b/gi, '')
-      // Supprimer les mots de matière du titre s'ils sont déjà reconnus
-      .replace(/\b(?:histoire|g[eé]o(?:graphie)?|hg|maths?|math[eé]matiques?|calcul|sciences?|techno(?:logie)?|fran[cç]ais|edhc|[eé]criture|lecture|anglais|eps|dessin)\b/gi, '')
+      // Supprimer les abréviations de matières courantes du topic
+      .replace(/\b(?:histoire|g[eé]o(?:graphie)?|hg|maths?|math[eé]matiques?|calcul|sciences?|techno(?:logie)?|svt|physique|chimie|pc|fran[cç]ais|edhc|anglais|eps|aec|arts?)\b/gi, '')
       .replace(/\s+/g, ' ')
       .trim();
 
+    // Nettoyer d'éventuels tirets ou ponctuations orphelines
+    cleanedTopic = cleanedTopic.replace(/^[-–—:\s]+|[-–—:\s]+$/g, '').trim();
+
     // 5. Construction d'un titre pédagogique harmonisé
     let suggestedTitle = '';
+    const displayTopic = cleanedTopic.length > 2 ? cleanedTopic : undefined;
+
     if (subjectKeyword && levelCode) {
       suggestedTitle = `${subjectKeyword} - ${levelCode}`;
       if (week) suggestedTitle += ` - Semaine ${week}`;
-      if (cleanedTitle.length > 2) suggestedTitle += ` : ${cleanedTitle}`;
+      if (displayTopic) suggestedTitle += ` : ${displayTopic}`;
     } else if (subjectKeyword) {
-      suggestedTitle = subjectKeyword + (cleanedTitle.length > 2 ? ` : ${cleanedTitle}` : '');
+      suggestedTitle = subjectKeyword + (displayTopic ? ` : ${displayTopic}` : '');
     } else {
-      suggestedTitle = baseName.replace(/[._-]+/g, ' ').trim();
+      suggestedTitle = spaced.length > 0 ? spaced : baseName;
     }
 
     const isCompliant = !!(levelCode && subjectKeyword);
@@ -93,10 +159,12 @@ export class ImportParserService {
       originalName: fileName,
       levelCode,
       subjectKeyword,
+      subjectSlug,
       week,
-      topic: cleanedTitle.length > 2 ? cleanedTitle : undefined,
+      topic: displayTopic,
       suggestedTitle,
       isCompliant,
     };
   }
 }
+
