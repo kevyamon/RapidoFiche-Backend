@@ -12,46 +12,34 @@ import { logger } from '../utils/logger.utils';
 export class BootstrapService {
   public static async autoSeedIfEmpty(): Promise<void> {
     try {
-      const levelCount = await EducationLevelModel.countDocuments();
-      if (levelCount > 0) {
-        return;
-      }
+      // 1. Nettoyage de sécurité des anciens éléments préscolaires si présents
+      await EducationLevelModel.deleteMany({ code: { $in: ['PS', 'MS', 'GS'] } });
+      await CycleModel.deleteMany({ name: 'PRESCHOOL' });
 
-      logger.info('SYSTEM', 'Base de données vide : initialisation automatique du référentiel...');
-
-      // 1. Cycles
-      const preschoolCycle = await CycleModel.findOneAndUpdate(
-        { name: 'PRESCHOOL' },
-        { name: 'PRESCHOOL', label: 'Préscolaire', order: 1, active: true },
-        { upsert: true, new: true }
-      );
-
+      // 2. Cycle Primaire Unique
       const primaryCycle = await CycleModel.findOneAndUpdate(
         { name: 'PRIMARY' },
-        { name: 'PRIMARY', label: 'Primaire', order: 2, active: true },
+        { name: 'PRIMARY', label: 'Enseignement Primaire', order: 1, active: true },
         { upsert: true, new: true }
       );
 
-      if (!preschoolCycle || !primaryCycle) {
-        throw new Error('Impossible d’initialiser les cycles');
+      if (!primaryCycle) {
+        throw new Error('Impossible d’initialiser le cycle primaire');
       }
 
-      // 2. Les 9 Niveaux (CDC Section 11)
+      // 3. Les 6 Niveaux Officiels du Primaire (CP1 au CM2)
       const levelsData: Array<{
         cycleId: mongoose.Types.ObjectId;
         code: EducationLevelCode;
         label: string;
         order: number;
       }> = [
-        { cycleId: preschoolCycle._id as mongoose.Types.ObjectId, code: 'PS', label: 'Petite Section', order: 1 },
-        { cycleId: preschoolCycle._id as mongoose.Types.ObjectId, code: 'MS', label: 'Moyenne Section', order: 2 },
-        { cycleId: preschoolCycle._id as mongoose.Types.ObjectId, code: 'GS', label: 'Grande Section', order: 3 },
-        { cycleId: primaryCycle._id as mongoose.Types.ObjectId, code: 'CP1', label: 'Cours Préparatoire 1ère année', order: 4 },
-        { cycleId: primaryCycle._id as mongoose.Types.ObjectId, code: 'CP2', label: 'Cours Préparatoire 2ème année', order: 5 },
-        { cycleId: primaryCycle._id as mongoose.Types.ObjectId, code: 'CE1', label: 'Cours Élémentaire 1ère année', order: 6 },
-        { cycleId: primaryCycle._id as mongoose.Types.ObjectId, code: 'CE2', label: 'Cours Élémentaire 2ème année', order: 7 },
-        { cycleId: primaryCycle._id as mongoose.Types.ObjectId, code: 'CM1', label: 'Cours Moyen 1ère année', order: 8 },
-        { cycleId: primaryCycle._id as mongoose.Types.ObjectId, code: 'CM2', label: 'Cours Moyen 2ème année', order: 9 },
+        { cycleId: primaryCycle._id as mongoose.Types.ObjectId, code: 'CP1', label: 'Cours Préparatoire 1ère année', order: 1 },
+        { cycleId: primaryCycle._id as mongoose.Types.ObjectId, code: 'CP2', label: 'Cours Préparatoire 2ème année', order: 2 },
+        { cycleId: primaryCycle._id as mongoose.Types.ObjectId, code: 'CE1', label: 'Cours Élémentaire 1ère année', order: 3 },
+        { cycleId: primaryCycle._id as mongoose.Types.ObjectId, code: 'CE2', label: 'Cours Élémentaire 2ème année', order: 4 },
+        { cycleId: primaryCycle._id as mongoose.Types.ObjectId, code: 'CM1', label: 'Cours Moyen 1ère année', order: 5 },
+        { cycleId: primaryCycle._id as mongoose.Types.ObjectId, code: 'CM2', label: 'Cours Moyen 2ème année', order: 6 },
       ];
 
       const levelMap = new Map<string, mongoose.Types.ObjectId>();
@@ -68,22 +56,22 @@ export class BootstrapService {
       }
 
       const allLevelIds = Array.from(levelMap.values());
-      const primaryLevelIds = [
-        levelMap.get('CP1')!,
-        levelMap.get('CP2')!,
+      const ceCmLevelIds = [
         levelMap.get('CE1')!,
         levelMap.get('CE2')!,
         levelMap.get('CM1')!,
         levelMap.get('CM2')!,
       ].filter(Boolean);
 
-      // 3. Matières
+      // 4. Les 7 Matières Officielles Conformes au Programme National (Document Matières)
       const subjectsData = [
-        { name: 'Mathématiques', slug: 'mathematiques', levelIds: allLevelIds, order: 1 },
-        { name: 'Français', slug: 'francais', levelIds: allLevelIds, order: 2 },
-        { name: 'Sciences et Technologie', slug: 'sciences-technologie', levelIds: primaryLevelIds, order: 3 },
-        { name: 'Histoire-Géographie', slug: 'histoire-geographie', levelIds: primaryLevelIds, order: 4 },
-        { name: 'EDHC', slug: 'edhc', levelIds: primaryLevelIds, order: 5 },
+        { name: 'Français', slug: 'francais', levelIds: allLevelIds, icon: 'book-open', order: 1 },
+        { name: 'Mathématiques', slug: 'mathematiques', levelIds: allLevelIds, icon: 'calculator', order: 2 },
+        { name: 'Éducation aux Droits de l’Homme et à la Citoyenneté (EDHC)', slug: 'edhc', levelIds: allLevelIds, icon: 'shield-check', order: 3 },
+        { name: 'Arts et Culture (AEC)', slug: 'arts-culture-aec', levelIds: allLevelIds, icon: 'palette', order: 4 },
+        { name: 'Éducation Physique et Sportive (EPS)', slug: 'eps', levelIds: allLevelIds, icon: 'activity', order: 5 },
+        { name: 'Sciences et Technologie', slug: 'sciences-technologie', levelIds: ceCmLevelIds, icon: 'microscope', order: 6 },
+        { name: 'Histoire-Géographie', slug: 'histoire-geographie', levelIds: ceCmLevelIds, icon: 'compass', order: 7 },
       ];
 
       const subjectMap = new Map<string, mongoose.Types.ObjectId>();
@@ -99,7 +87,7 @@ export class BootstrapService {
         }
       }
 
-      // 4. Domaines Pédagogiques Clés
+      // 5. Domaines Pédagogiques Clés
       const mathId = subjectMap.get('mathematiques');
       if (mathId) {
         await SubjectDomainModel.findOneAndUpdate(
@@ -114,7 +102,7 @@ export class BootstrapService {
         );
       }
 
-      // 5. Offre Commerciale MVP (200 FCFA / 30 jours)
+      // 6. Offre Commerciale MVP (200 FCFA / 30 jours)
       await SubscriptionPlanModel.findOneAndUpdate(
         { code: 'ESSENTIEL' },
         {
@@ -134,7 +122,7 @@ export class BootstrapService {
         { upsert: true, new: true }
       );
 
-      // 6. Super Administrateur par défaut
+      // 7. Super Administrateur par défaut
       const adminEmail = 'admin@rapidofiche.ci';
       const existingAdmin = await UserModel.findOne({ email: adminEmail });
       if (!existingAdmin) {
@@ -151,7 +139,7 @@ export class BootstrapService {
         logger.info('SYSTEM', `Compte Administrateur initial créé : ${adminEmail}`);
       }
 
-      logger.info('SYSTEM', 'Référentiel pédagogique initialisé avec succès !');
+      logger.info('SYSTEM', 'Référentiel pédagogique primaire (CP1 à CM2) initialisé avec succès !');
     } catch (err: unknown) {
       logger.error('SYSTEM', 'Erreur lors de l’auto-seeding du référentiel', {
         error: err instanceof Error ? err.message : String(err),

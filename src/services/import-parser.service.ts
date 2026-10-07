@@ -51,16 +51,16 @@ const SUBJECT_PATTERNS: SubjectPattern[] = [
     standardName: 'Mathématiques',
     slug: 'mathematiques',
   },
-  // 6. Arts Plastiques / AEC
+  // 6. Arts et Culture / AEC
   {
-    regex: /\b(?:arts?\s+plastiques?|a[\s._-]*e[\s._-]*c|dessin|peinture|chant|musique|bricolage|arts?)\b/i,
-    standardName: 'Arts Plastiques',
-    slug: 'arts-plastiques',
+    regex: /\b(?:arts?(?:\s+et\s+culture|\s+plastiques?)?|a[\s._-]*e[\s._-]*c|dessin|peinture|chant|musique|comptine|activit[eé]s?\s+coop[eé]ratives?|bricolage)\b/i,
+    standardName: 'Arts et Culture (AEC)',
+    slug: 'arts-culture-aec',
   },
   // 7. EPS
   {
-    regex: /\b(?:eps|e[\s._-]*p[\s._-]*s|[eé]ducation\s+physique|sport|motricit[eé]|gymnastique)\b/i,
-    standardName: 'EPS',
+    regex: /\b(?:eps|e[\s._-]*p[\s._-]*s|[eé]ducation\s+physique(?:\s+et\s+sportive)?|sport|motricit[eé]|gymnastique)\b/i,
+    standardName: 'Éducation Physique et Sportive (EPS)',
     slug: 'eps',
   },
   // 8. Anglais
@@ -92,7 +92,7 @@ export class ImportParserService {
     let subjectSlug: string | undefined;
     let week: number | undefined;
 
-    // 1. Détection du Niveau (PS, MS, GS, CP1, CP2, CE1, CE2, CM1, CM2)
+    // 1. Détection du Niveau (CP1, CP2, CE1, CE2, CM1, CM2)
     for (const code of EDUCATION_LEVEL_CODES) {
       const levelRegex = new RegExp(`\\b${code}\\b`, 'i');
       if (levelRegex.test(spaced)) {
@@ -127,7 +127,7 @@ export class ImportParserService {
       // Supprimer les mentions de bruit et versions
       .replace(/\b(?:recadr[eé]e?|ok\b(?:\s*\d+)?|partie\s*\d+|tome\s*\d+|version\s*\d+|v\d+|copie|fiche|le[cç]on|cours)\b/gi, '')
       // Supprimer le code de classe extrait ou présent
-      .replace(/\b(?:PS|MS|GS|CP1|CP2|CE1|CE2|CM1|CM2)\b/gi, '')
+      .replace(/\b(?:CP1|CP2|CE1|CE2|CM1|CM2)\b/gi, '')
       // Supprimer les mentions de semaine
       .replace(/\b(?:semaine|sem|s|w)\s*[0-9]{1,2}\b/gi, '')
       // Supprimer les abréviations de matières courantes du topic

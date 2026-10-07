@@ -1,6 +1,6 @@
 import { Schema, model, Document } from 'mongoose';
 
-export type CycleName = 'PRESCHOOL' | 'PRIMARY';
+export type CycleName = 'PRIMARY';
 
 export interface ICycle {
   name: CycleName;
@@ -18,7 +18,7 @@ const cycleSchema = new Schema<ICycleDocument>(
     name: {
       type: String,
       required: [true, 'Le nom du cycle est obligatoire'],
-      enum: ['PRESCHOOL', 'PRIMARY'],
+      enum: ['PRIMARY'],
       unique: true,
       trim: true,
     },

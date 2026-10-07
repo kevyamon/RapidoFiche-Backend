@@ -1,9 +1,6 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
 export const EDUCATION_LEVEL_CODES = [
-  'PS',
-  'MS',
-  'GS',
   'CP1',
   'CP2',
   'CE1',
