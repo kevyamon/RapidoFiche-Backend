@@ -117,6 +117,8 @@ apiRouter.get('/me/subscription', authenticate, SubscriptionPaymentController.ge
 apiRouter.get('/subscriptions/me', authenticate, SubscriptionPaymentController.getMySubscription);
 apiRouter.get('/me/payments', authenticate, SubscriptionPaymentController.getMyPayments);
 apiRouter.get('/payments/me', authenticate, SubscriptionPaymentController.getMyPayments);
+apiRouter.delete('/me/payments/:id', authenticate, SubscriptionPaymentController.deletePayment);
+apiRouter.delete('/me/payments', authenticate, SubscriptionPaymentController.clearPayments);
 
 apiRouter.get('/me/profile', authenticate, AuthController.getMe);
 apiRouter.patch(

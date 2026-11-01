@@ -201,4 +201,25 @@ export class PaymentService {
       .lean();
     return payments as unknown as IPaymentDocument[];
   }
+
+  public static async deleteTeacherPayment(userId: string, paymentId: string): Promise<void> {
+    if (!paymentId || !Types.ObjectId.isValid(paymentId)) {
+      throw new AppError(ERROR_CODES.VALIDATION_ERROR, 'Identifiant de transaction invalide', 400);
+    }
+    const payment = await PaymentModel.findOne({
+      _id: new Types.ObjectId(paymentId),
+      userId: new Types.ObjectId(userId),
+    });
+    if (!payment) {
+      throw new AppError(ERROR_CODES.PAYMENT_NOT_FOUND, 'Transaction introuvable', 404);
+    }
+    await PaymentModel.findByIdAndDelete(payment._id);
+  }
+
+  public static async clearTeacherPayments(userId: string): Promise<number> {
+    const result = await PaymentModel.deleteMany({
+      userId: new Types.ObjectId(userId),
+    });
+    return result.deletedCount || 0;
+  }
 }

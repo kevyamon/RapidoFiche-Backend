@@ -103,6 +103,40 @@ export class SubscriptionPaymentController {
     }
   }
 
+  public static async deletePayment(
+    req: Request,
+    res: Response<ApiSuccessResponse<{ message: string }>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      if (!req.user) throw AppError.unauthorized();
+      await PaymentService.deleteTeacherPayment(req.user.id, req.params.id);
+      res.status(200).json({
+        success: true,
+        data: { message: 'Transaction supprimée avec succès' },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public static async clearPayments(
+    req: Request,
+    res: Response<ApiSuccessResponse<{ message: string; deletedCount: number }>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      if (!req.user) throw AppError.unauthorized();
+      const count = await PaymentService.clearTeacherPayments(req.user.id);
+      res.status(200).json({
+        success: true,
+        data: { message: 'Historique des transactions supprimé avec succès', deletedCount: count },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   public static async handleWebhook(
     req: Request,
     res: Response,
