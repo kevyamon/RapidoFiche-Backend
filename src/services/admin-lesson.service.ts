@@ -187,8 +187,8 @@ export class AdminLessonService {
       { $set: { status: 'PUBLISHED', updatedBy: new Types.ObjectId(adminId) } }
     );
 
-    await AuditService.logAction(adminId, 'LESSONS_BULK_PUBLISHED', 'Lesson', 'ALL', {
-      count: result.modifiedCount,
+    await AuditService.logAction(adminId, 'LESSON_PUBLISHED', 'Lesson', 'ALL', {
+      bulkCount: result.modifiedCount,
     });
 
     emitToAdmin('ADMIN_DASHBOARD_UPDATE', { type: 'LESSONS_CHANGED' });
