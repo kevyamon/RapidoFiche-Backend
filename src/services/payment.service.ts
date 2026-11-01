@@ -199,16 +199,23 @@ export class PaymentService {
     const payments = await PaymentModel.find({ userId: new Types.ObjectId(userId) })
       .sort({ createdAt: -1 })
       .lean();
-    return payments as unknown as IPaymentDocument[];
+    return payments.map((p: any) => ({
+      ...p,
+      id: p._id?.toString() || p.id,
+    })) as unknown as IPaymentDocument[];
   }
 
-  public static async deleteTeacherPayment(userId: string, paymentId: string): Promise<void> {
-    if (!paymentId || !Types.ObjectId.isValid(paymentId)) {
+  public static async deleteTeacherPayment(userId: string, identifier: string): Promise<void> {
+    if (!identifier || typeof identifier !== 'string') {
       throw new AppError(ERROR_CODES.VALIDATION_ERROR, 'Identifiant de transaction invalide', 400);
     }
+    const isOid = Types.ObjectId.isValid(identifier) && identifier.length === 24;
     const payment = await PaymentModel.findOne({
-      _id: new Types.ObjectId(paymentId),
       userId: new Types.ObjectId(userId),
+      $or: [
+        ...(isOid ? [{ _id: new Types.ObjectId(identifier) }] : []),
+        { reference: identifier },
+      ],
     });
     if (!payment) {
       throw new AppError(ERROR_CODES.PAYMENT_NOT_FOUND, 'Transaction introuvable', 404);
