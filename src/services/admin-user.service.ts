@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { UserModel, IUserDocument } from '../models/user.model';
 import { EducationLevelModel } from '../models/education-level.model';
+import { SubscriptionModel } from '../models/subscription.model';
 import { AuditService } from './audit.service';
 import { PaginationMeta } from '../contracts/api.types';
 import { AppError } from '../utils/app-error.utils';
@@ -54,11 +55,41 @@ export class AdminUserService {
       UserModel.countDocuments(filter),
     ]);
 
+    const userIds = users.map((u: any) => u._id);
+    const subscriptions = await SubscriptionModel.find({
+      userId: { $in: userIds },
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const subMap = new Map<string, any>();
+    const now = Date.now();
+    for (const sub of subscriptions) {
+      const uid = sub.userId.toString();
+      if (!subMap.has(uid)) {
+        const isCurrentlyActive = sub.status === 'ACTIVE' && sub.endDate && new Date(sub.endDate).getTime() > now;
+        let daysRemaining = 0;
+        if (isCurrentlyActive && sub.endDate) {
+          daysRemaining = Math.max(0, Math.ceil((new Date(sub.endDate).getTime() - now) / (1000 * 60 * 60 * 24)));
+        }
+        subMap.set(uid, {
+          status: isCurrentlyActive ? 'ACTIVE' : (sub.status === 'ACTIVE' ? 'EXPIRED' : sub.status),
+          startDate: sub.startDate,
+          endDate: sub.endDate,
+          daysRemaining,
+        });
+      }
+    }
+
     const totalPages = Math.ceil(total / limit) || 1;
-    const normalizedUsers = users.map((u: any) => ({
-      ...u,
-      id: u._id?.toString() || u.id,
-    }));
+    const normalizedUsers = users.map((u: any) => {
+      const id = u._id?.toString() || u.id;
+      return {
+        ...u,
+        id,
+        subscription: subMap.get(id) || { status: 'NONE', daysRemaining: 0 },
+      };
+    });
 
     return {
       users: normalizedUsers as unknown as IUserDocument[],

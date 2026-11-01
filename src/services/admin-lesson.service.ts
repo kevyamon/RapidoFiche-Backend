@@ -1,7 +1,13 @@
+import fs from 'fs';
+import path from 'path';
 import { Types } from 'mongoose';
 import { LessonModel, ILessonDocument } from '../models/lesson.model';
 import { EducationLevelModel } from '../models/education-level.model';
 import { SubjectModel } from '../models/subject.model';
+import { AssetModel } from '../models/asset.model';
+import { FavoriteModel } from '../models/favorite.model';
+import { LessonHistoryModel } from '../models/lesson-history.model';
+import { StorageService } from '../integrations/storage/storage.service';
 import { CreateLessonInput, UpdateLessonInput } from '../schemas/lesson.schema';
 import { AuditService } from './audit.service';
 import { AppError } from '../utils/app-error.utils';
@@ -195,5 +201,51 @@ export class AdminLessonService {
     emitToAll('CATALOG_UPDATED', { bulk: true, status: 'PUBLISHED' });
 
     return { publishedCount: result.modifiedCount };
+  }
+
+  public static async deleteLessonPermanently(
+    adminId: string,
+    lessonId: string
+  ): Promise<void> {
+    if (!lessonId || !Types.ObjectId.isValid(lessonId)) {
+      throw new AppError(ERROR_CODES.LESSON_NOT_FOUND, 'Identifiant de fiche invalide', 400);
+    }
+
+    const lesson = await LessonModel.findById(lessonId);
+    if (!lesson) {
+      throw new AppError(ERROR_CODES.LESSON_NOT_FOUND, 'Fiche introuvable', 404);
+    }
+
+    // Nettoyage des fichiers physiques et documents d'assets
+    const assetIds = [lesson.fileAssetId, lesson.thumbnailAssetId].filter(Boolean);
+    if (assetIds.length > 0) {
+      const assets = await AssetModel.find({ _id: { $in: assetIds } });
+      const canonicalDir = StorageService.getStorageDirectory();
+      for (const asset of assets) {
+        if (asset.storageKey) {
+          try {
+            const filePath = path.join(canonicalDir, asset.storageKey);
+            if (fs.existsSync(filePath)) {
+              await fs.promises.unlink(filePath);
+            }
+          } catch {
+            // Ignorer l'erreur si fichier déjà absent du disque
+          }
+        }
+      }
+      await AssetModel.deleteMany({ _id: { $in: assetIds } });
+    }
+
+    // Nettoyage des dépendances relationnelles
+    await FavoriteModel.deleteMany({ lessonId: lesson._id });
+    await LessonHistoryModel.deleteMany({ lessonId: lesson._id });
+    await LessonModel.findByIdAndDelete(lesson._id);
+
+    await AuditService.logAction(adminId, 'LESSON_DELETED', 'Lesson', lessonId, {
+      title: lesson.title,
+    });
+
+    emitToAdmin('ADMIN_DASHBOARD_UPDATE', { type: 'LESSONS_CHANGED' });
+    emitToAll('CATALOG_UPDATED', { lessonId, deleted: true });
   }
 }

@@ -22,14 +22,7 @@ export class AdminManagementController {
       const levelId = req.query.levelId as string | undefined;
 
       const result = await AdminUserService.getUsers(
-        {
-          page,
-          limit,
-          search,
-          role,
-          status,
-          levelId,
-        },
+        { page, limit, search, role, status, levelId },
         req.user.role
       );
 
@@ -91,6 +84,37 @@ export class AdminManagementController {
         success: true,
         data: { message: 'Compte réactivé avec succès' },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public static async updateUserStatus(
+    req: Request,
+    res: Response<ApiSuccessResponse<{ message: string }>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      if (!req.user) throw AppError.unauthorized();
+      const { status, reason } = req.body;
+      if (status === 'ACTIVE') {
+        await AdminUserService.reactivateUser(req.user.id, req.params.id, req.user.role);
+        res.status(200).json({
+          success: true,
+          data: { message: 'Compte réactivé avec succès' },
+        });
+      } else {
+        await AdminUserService.suspendUser(
+          req.user.id,
+          req.params.id,
+          req.user.role,
+          reason
+        );
+        res.status(200).json({
+          success: true,
+          data: { message: 'Compte suspendu avec succès' },
+        });
+      }
     } catch (error) {
       next(error);
     }
@@ -214,6 +238,23 @@ export class AdminManagementController {
       res.status(200).json({
         success: true,
         data: { message: 'Fiche archivée avec succès', lesson },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public static async deleteLesson(
+    req: Request,
+    res: Response<ApiSuccessResponse<{ message: string }>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      if (!req.user) throw AppError.unauthorized();
+      await AdminLessonService.deleteLessonPermanently(req.user.id, req.params.id);
+      res.status(200).json({
+        success: true,
+        data: { message: 'Fiche supprimée définitivement avec succès' },
       });
     } catch (error) {
       next(error);

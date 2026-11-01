@@ -179,7 +179,7 @@ apiRouter.get('/admin/users/:id', adminAuth, AdminManagementController.getUserBy
 apiRouter.post('/admin/users/:id/suspend', adminAuth, AdminManagementController.suspendUser);
 apiRouter.post('/admin/users/:id/reactivate', adminAuth, AdminManagementController.reactivateUser);
 apiRouter.patch('/admin/users/:id/level', adminAuth, AdminManagementController.changeUserLevel);
-apiRouter.patch('/admin/users/:id/status', adminAuth, AdminManagementController.suspendUser);
+apiRouter.patch('/admin/users/:id/status', adminAuth, AdminManagementController.updateUserStatus);
 
 // Fiches
 apiRouter.post('/admin/lessons', adminAuth, validate(createLessonSchema), AdminManagementController.createLesson);
@@ -189,8 +189,9 @@ apiRouter.post('/admin/lessons/:id/publish', adminAuth, AdminManagementControlle
 apiRouter.patch('/admin/lessons/:id/publish', adminAuth, AdminManagementController.publishLesson);
 apiRouter.post('/admin/lessons/:id/unpublish', adminAuth, AdminManagementController.unpublishLesson);
 apiRouter.patch('/admin/lessons/:id/unpublish', adminAuth, AdminManagementController.unpublishLesson);
-apiRouter.delete('/admin/lessons/:id', adminAuth, AdminManagementController.archiveLesson);
+apiRouter.post('/admin/lessons/:id/archive', adminAuth, AdminManagementController.archiveLesson);
 apiRouter.patch('/admin/lessons/:id/archive', adminAuth, AdminManagementController.archiveLesson);
+apiRouter.delete('/admin/lessons/:id', adminAuth, AdminManagementController.deleteLesson);
 
 // Importation Massive
 apiRouter.post('/admin/imports', adminAuth, upload.array('files', 50), AdminOperationsController.uploadBatch);
