@@ -53,7 +53,7 @@ describe('Tests de Contrôle d’Accès Mode Forteresse (CDC Section 141)', () =
     expect(result.lesson).toBeDefined();
   });
 
-  it('Scénario 2 : Teacher CM2 + Abonnement ACTIF + Fiche CE1 -> DENIED (LEVEL_ACCESS_DENIED)', async () => {
+  it('Scénario 2 : Teacher CM2 + Abonnement ACTIF + Fiche CE1 -> ALLOWED (Accès illimité catalogue)', async () => {
     vi.spyOn(LessonModel, 'findById').mockResolvedValue({
       id: ce1LessonId,
       levelId: new Types.ObjectId(ce1LevelId),
@@ -64,7 +64,7 @@ describe('Tests de Contrôle d’Accès Mode Forteresse (CDC Section 141)', () =
       lean: vi.fn().mockResolvedValue({
         _id: new Types.ObjectId(teacherId),
         role: ROLES.TEACHER,
-        primaryLevelId: new Types.ObjectId(cm2LevelId), // CM2 !== CE1
+        primaryLevelId: new Types.ObjectId(cm2LevelId),
         status: 'ACTIVE',
       }),
     } as any);
@@ -74,17 +74,14 @@ describe('Tests de Contrôle d’Accès Mode Forteresse (CDC Section 141)', () =
       endDate: new Date(Date.now() + 86400000),
     } as any);
 
-    await expect(
-      ContentAccessService.assertCanAccessLesson(teacherId, ROLES.TEACHER, ce1LessonId)
-    ).rejects.toThrow(AppError);
+    const result = await ContentAccessService.assertCanAccessLesson(
+      teacherId,
+      ROLES.TEACHER,
+      ce1LessonId
+    );
 
-    try {
-      await ContentAccessService.assertCanAccessLesson(teacherId, ROLES.TEACHER, ce1LessonId);
-    } catch (err: unknown) {
-      const appErr = err as AppError;
-      expect(appErr.code).toBe(ERROR_CODES.LEVEL_ACCESS_DENIED);
-      expect(appErr.statusCode).toBe(403);
-    }
+    expect(result.allowed).toBe(true);
+    expect(result.lesson).toBeDefined();
   });
 
   it('Scénario 3 : Teacher CM2 + Abonnement EXPIRÉ + Fiche CM2 -> DENIED (SUBSCRIPTION_EXPIRED)', async () => {

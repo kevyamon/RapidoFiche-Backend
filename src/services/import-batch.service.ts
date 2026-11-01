@@ -97,7 +97,7 @@ export class ImportBatchService {
             week: parsed.week || 1,
             topic: parsed.topic || title,
             fileAssetId: new Types.ObjectId(asset.id),
-            status: 'DRAFT',
+            status: 'PUBLISHED',
             createdBy: new Types.ObjectId(adminId),
           });
           lessonId = new Types.ObjectId(lesson.id);
@@ -207,7 +207,7 @@ export class ImportBatchService {
       week: item.parsedData?.week || 1,
       topic: item.parsedData?.topic || item.originalName,
       fileAssetId: item.assetId,
-      status: 'DRAFT',
+      status: 'PUBLISHED',
       createdBy: new Types.ObjectId(adminId),
     });
 

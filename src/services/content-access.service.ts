@@ -99,7 +99,7 @@ export class ContentAccessService {
       throw AppError.subscriptionRequired();
     }
 
-    // 6. Vérification du niveau principal de l'enseignant (Règle d'abonnement au niveau MVP)
+    // 6. Gestion du niveau de l'enseignant
     let userLevelId = user.primaryLevelId?.toString();
     const lessonLevelId = lesson.levelId.toString();
 
@@ -107,10 +107,6 @@ export class ContentAccessService {
     if (!userLevelId) {
       await UserModel.findByIdAndUpdate(userId, { primaryLevelId: lesson.levelId });
       userLevelId = lessonLevelId;
-    }
-
-    if (userLevelId !== lessonLevelId) {
-      throw AppError.levelAccessDenied();
     }
 
     return {

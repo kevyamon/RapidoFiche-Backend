@@ -178,4 +178,22 @@ export class AdminLessonService {
 
     return lesson;
   }
+
+  public static async publishAllDrafts(
+    adminId: string
+  ): Promise<{ publishedCount: number }> {
+    const result = await LessonModel.updateMany(
+      { status: 'DRAFT' },
+      { $set: { status: 'PUBLISHED', updatedBy: new Types.ObjectId(adminId) } }
+    );
+
+    await AuditService.logAction(adminId, 'LESSONS_BULK_PUBLISHED', 'Lesson', 'ALL', {
+      count: result.modifiedCount,
+    });
+
+    emitToAdmin('ADMIN_DASHBOARD_UPDATE', { type: 'LESSONS_CHANGED' });
+    emitToAll('CATALOG_UPDATED', { bulk: true, status: 'PUBLISHED' });
+
+    return { publishedCount: result.modifiedCount };
+  }
 }

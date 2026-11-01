@@ -184,6 +184,7 @@ apiRouter.patch('/admin/users/:id/status', adminAuth, AdminManagementController.
 // Fiches
 apiRouter.post('/admin/lessons', adminAuth, validate(createLessonSchema), AdminManagementController.createLesson);
 apiRouter.patch('/admin/lessons/:id', adminAuth, validate(updateLessonSchema), AdminManagementController.updateLesson);
+apiRouter.post('/admin/lessons/publish-all', adminAuth, AdminManagementController.publishAllDrafts);
 apiRouter.post('/admin/lessons/:id/publish', adminAuth, AdminManagementController.publishLesson);
 apiRouter.patch('/admin/lessons/:id/publish', adminAuth, AdminManagementController.publishLesson);
 apiRouter.post('/admin/lessons/:id/unpublish', adminAuth, AdminManagementController.unpublishLesson);

@@ -169,6 +169,23 @@ export class AdminManagementController {
     }
   }
 
+  public static async publishAllDrafts(
+    req: Request,
+    res: Response<ApiSuccessResponse<unknown>>,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      if (!req.user) throw AppError.unauthorized();
+      const result = await AdminLessonService.publishAllDrafts(req.user.id);
+      res.status(200).json({
+        success: true,
+        data: { message: `${result.publishedCount} fiche(s) publiée(s) avec succès`, ...result },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   public static async unpublishLesson(
     req: Request,
     res: Response<ApiSuccessResponse<unknown>>,
